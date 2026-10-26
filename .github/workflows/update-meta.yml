@@ -11,7 +11,7 @@ on:
       minutes:
         description: 'Durée de collecte en minutes'
         required: false
-        default: '90'
+        default: '180'
 
 permissions:
   contents: write
@@ -39,8 +39,8 @@ jobs:
       - name: Collecte des parties et calcul des builds
         env:
           RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
-          MINUTES: ${{ github.event.inputs.minutes || '90' }}
-          REGIONS: ${{ vars.REGIONS || 'euw1,kr,na1' }}
+          MINUTES: ${{ github.event.inputs.minutes || '180' }}
+          REGIONS: ${{ vars.REGIONS || 'euw1,kr,na1,sg2' }}
         run: node src/run.mjs
 
       - name: Publication de meta.json
