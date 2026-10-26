@@ -1,0 +1,51 @@
+# Met à jour meta.json chaque jour à partir des parties classées Master+ (API officielle Riot).
+name: Mettre à jour la méta
+
+on:
+  schedule:
+    # Tous les jours à 04h17 UTC (06h17 heure de Paris en été, 05h17 en hiver).
+    - cron: '17 4 * * *'
+  # Bouton « Run workflow » dans l'onglet Actions pour lancer à la main.
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: 'Durée de collecte en minutes'
+        required: false
+        default: '90'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: meta
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Collecte des parties et calcul des builds
+        env:
+          RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
+          MINUTES: ${{ github.event.inputs.minutes || '90' }}
+          REGIONS: ${{ vars.REGIONS || 'euw1,kr,na1' }}
+        run: node src/run.mjs
+
+      - name: Publication de meta.json
+        run: |
+          git config user.name "tactique-meta-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A meta.json state
+          if git diff --cached --quiet; then
+            echo "Aucun changement."
+          else
+            git commit -m "Méta du $(date -u +%Y-%m-%d)"
+            git push
+          fi
