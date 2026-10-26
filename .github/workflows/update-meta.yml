@@ -3,7 +3,7 @@ name: Mettre à jour la méta
 
 on:
   schedule:
-    # Tous les jours à 04h17 UTC (06h17 heure de Paris en été, 05h17 en hiver).
+    # Tous les jours à 04h17 UTC (05h17 heure de Paris en hiver, 06h17 en été).
     - cron: '17 4 * * *'
   # Bouton « Run workflow » dans l'onglet Actions pour lancer à la main.
   workflow_dispatch:
@@ -16,6 +16,7 @@ on:
 permissions:
   contents: write
 
+# Une seule exécution à la fois : les suivantes attendent leur tour.
 concurrency:
   group: meta
   cancel-in-progress: false
@@ -25,9 +26,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 240
     steps:
-      - uses: actions/checkout@v4
+      # On part de la DERNIÈRE version de main au moment où l'exécution démarre (et non de celle
+      # du moment où elle a été déclenchée), pour récupérer le travail d'une exécution précédente.
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
 
@@ -39,13 +44,20 @@ jobs:
         run: node src/run.mjs
 
       - name: Publication de meta.json
+        env:
+          BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           git config user.name "tactique-meta-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A meta.json state
           if git diff --cached --quiet; then
             echo "Aucun changement."
-          else
-            git commit -m "Méta du $(date -u +%Y-%m-%d)"
-            git push
+            exit 0
           fi
+          git commit -m "Méta du $(date -u +%Y-%m-%d)"
+          # Si main a bougé entre-temps, on se replace dessus en gardant les nouvelles données.
+          for attempt in 1 2 3; do
+            if git push; then exit 0; fi
+            git pull --rebase -X theirs origin "$BRANCH"
+          done
+          echo "Échec de la publication après 3 essais." && exit 1
