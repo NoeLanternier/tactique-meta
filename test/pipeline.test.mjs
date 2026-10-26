@@ -2,8 +2,17 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { buildDdragon } from '../src/ddragon.mjs'
-import { extractJunglers, precheck, skillOrder } from '../src/extract.mjs'
-import { addRecord, buildMeta, emptyState, selectBuild } from '../src/aggregate.mjs'
+import { extractJunglers, extractProfiles, precheck, skillOrder } from '../src/extract.mjs'
+import {
+  addProfiles,
+  addRecord,
+  buildMeta,
+  buildProfiles,
+  contextsOf,
+  emptyState,
+  seedFromPrevious,
+  selectBuild
+} from '../src/aggregate.mjs'
 import { RiotClient } from '../src/riot.mjs'
 
 const runesJson = [
@@ -79,11 +88,21 @@ const PAGE = {
 function fakeGame(win, coreIds, boots = 3047) {
   const participants = Array.from({ length: 10 }, (_, i) => ({
     participantId: i + 1,
+    teamId: i < 5 ? 100 : 200,
     championId: i === 0 ? 64 : i === 5 ? 62 : 1,
     championName: 'X',
     teamPosition: i === 0 || i === 5 ? 'JUNGLE' : 'TOP',
     win: i < 5 ? win : !win,
-    perks: PAGE
+    perks: PAGE,
+    physicalDamageDealtToChampions: 10000,
+    magicDamageDealtToChampions: i >= 5 ? 30000 : 2000,
+    totalHeal: 3000,
+    damageSelfMitigated: 15000,
+    totalDamageTaken: 20000,
+    timeCCingOthers: 20,
+    totalDamageShieldedOnTeammates: 0,
+    item0: coreIds[0],
+    item1: coreIds[1] ?? 0
   }))
   const ev = (type, extra, t) => ({ type, participantId: 1, timestamp: t, ...extra })
   const events = [
@@ -189,4 +208,43 @@ test('client Riot : limite de débit et 429', async () => {
   await Promise.all([1, 2, 3, 4].map(() => riot.get('euw1', '/y')))
   assert.ok(Date.now() - t1 >= 900, 'la 4e requête attend la fenêtre suivante')
   await assert.rejects(async () => new RiotClient('mauvaise-cle'))
+})
+
+
+test('profils mesurés et contextes adverses', () => {
+  const [m, t] = fakeGame(true, [6692, 3071, 6333])
+  const profs = extractProfiles(m, dd)
+  assert.equal(profs.length, 10)
+  assert.equal(profs[0].champ, 'LeeSin')
+  assert.equal(profs[0].minutes, 30)
+  const recs = extractJunglers(m, t, dd)
+  const lee = recs.find((r) => r.champ === 'LeeSin')
+  assert.equal(lee.enemyJungler, 'MonkeyKing')
+  assert.ok(lee.enemy.magic > lee.enemy.phys) // équipe adverse très AP dans la partie simulée
+  const state = emptyState('16.21', 0)
+  assert.deepEqual(contextsOf(state, lee.enemy), ['all', 'ap']) // pas encore assez d'échantillons pour soins/tank/cc
+  for (let i = 0; i < 200; i++) contextsOf(state, { ...lee.enemy, heal: 1000 + (i % 10) * 100 })
+  const ctx = contextsOf(state, { ...lee.enemy, heal: 50000 })
+  assert.ok(ctx.includes('heal'))
+})
+
+test('meta v2 : profils, stats de junglers, objets par contexte, reprise du patch précédent', () => {
+  const state = emptyState('16.21', 0)
+  for (let i = 0; i < 60; i++) {
+    const [m, t] = fakeGame(i % 2 === 0, [6692, 3071, 6333, 3026])
+    for (const r of extractJunglers(m, t, dd)) addRecord(state, r)
+    addProfiles(state, extractProfiles(m, dd))
+  }
+  const meta = buildMeta(state, dd, null, { minGames: 40 })
+  assert.equal(meta.version, 2)
+  const lee = meta.builds.find((b) => b.id === 'LeeSin')
+  assert.ok(lee.situational.all.items.length > 0)
+  assert.ok(lee.situational.ap.items.some((x) => x.item === 'Guardian Angel'))
+  assert.equal(meta.junglers.LeeSin.games, 60)
+  assert.equal(meta.junglers.LeeSin.vs.MonkeyKing[0], 60)
+  const profiles = buildProfiles(state, 30)
+  assert.ok(profiles.LeeSin && profiles.LeeSin.ap < 0.2)
+  const seeded = seedFromPrevious(emptyState('16.22', 0), state, 0.25)
+  assert.equal(seeded.champs.LeeSin.g, 15)
+  assert.equal(seeded.seededFrom, '16.21')
 })

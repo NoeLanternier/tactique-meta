@@ -92,16 +92,65 @@ export function extractJunglers(match, timeline, dd) {
     const boots = bought.find((id) => dd.items.get(id)?.isBoots) ?? null
     const pet = bought.find((id) => dd.items.get(id)?.isPet) ?? null
 
+    // Contexte adverse réellement observé dans cette partie (dégâts, soins, résistance, contrôles).
+    const foes = info.participants.filter((x) => x.teamId !== p.teamId)
+    const sum = (f) => foes.reduce((acc, x) => acc + (Number(x[f]) || 0), 0)
+    const enemyJungler = foes.find((x) => x.teamPosition === 'JUNGLE')
+
     records.push({
       champ,
       win: Boolean(p.win),
       runeSig,
       core: legendaries.slice(0, 3),
       later: legendaries.slice(3, 6),
+      items: legendaries.slice(0, 6),
       boots,
       pet,
-      skills: skillOrder(events.get(p.participantId) ?? [])
+      skills: skillOrder(events.get(p.participantId) ?? []),
+      enemyJungler: enemyJungler
+        ? (dd.champById.get(enemyJungler.championId) ?? enemyJungler.championName)
+        : null,
+      enemy: {
+        minutes: (info.gameDuration ?? 0) / 60,
+        phys: sum('physicalDamageDealtToChampions'),
+        magic: sum('magicDamageDealtToChampions'),
+        heal: sum('totalHeal'),
+        tank: sum('damageSelfMitigated') + sum('totalDamageTaken'),
+        cc: sum('timeCCingOthers')
+      }
     })
   }
   return records
+}
+
+/**
+ * Profil mesuré de chacun des 10 joueurs d'une partie (tous postes) : sert à connaître le vrai
+ * profil de chaque champion (part de dégâts magiques, résistance, contrôles, soins, boucliers…).
+ */
+export function extractProfiles(match, dd) {
+  const info = match.info
+  const minutes = (info.gameDuration ?? 0) / 60
+  return info.participants.map((p) => {
+    let crit = 0
+    let as = 0
+    for (let i = 0; i <= 6; i++) {
+      const it = dd.items.get(p[`item${i}`])
+      if (!it?.isLegendary) continue
+      if (it.stats?.FlatCritChanceMod) crit++
+      if (it.stats?.PercentAttackSpeedMod) as++
+    }
+    const n = (f) => Number(p[f]) || 0
+    return {
+      champ: dd.champById.get(p.championId) ?? p.championName,
+      minutes,
+      phys: n('physicalDamageDealtToChampions'),
+      magic: n('magicDamageDealtToChampions'),
+      heal: n('totalHeal'),
+      shield: n('totalDamageShieldedOnTeammates'),
+      tank: n('damageSelfMitigated') + n('totalDamageTaken'),
+      cc: n('timeCCingOthers'),
+      crit,
+      as
+    }
+  })
 }

@@ -1,14 +1,21 @@
 // Point d'entrée : collecte des parties classées Master+ du patch en cours, puis calcul de meta.json.
 //
-//   node src/run.mjs --minutes 90 --regions euw1,kr,na1
+//   node src/run.mjs --minutes 180 --regions euw1,kr,na1,sg2
 //
 // Variables : RIOT_API_KEY (obligatoire), REGIONS, MINUTES, MIN_GAMES.
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { FatalError, PLATFORM_TO_REGION, RiotClient } from './riot.mjs'
 import { loadDdragon } from './ddragon.mjs'
-import { extractJunglers, precheck } from './extract.mjs'
-import { addRecord, buildMeta, emptyState } from './aggregate.mjs'
+import { extractJunglers, extractProfiles, precheck } from './extract.mjs'
+import {
+  addProfiles,
+  addRecord,
+  buildMeta,
+  emptyState,
+  seedFromPrevious,
+  upgradeState
+} from './aggregate.mjs'
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(`--${name}`)
@@ -19,7 +26,7 @@ function arg(name, fallback) {
 const config = {
   apiKey: (process.env.RIOT_API_KEY ?? '').trim(),
   minutes: Number(arg('minutes', process.env.MINUTES || '90')),
-  regions: String(arg('regions', process.env.REGIONS || 'euw1,kr,na1'))
+  regions: String(arg('regions', process.env.REGIONS || 'euw1,kr,na1,sg2'))
     .split(',')
     .map((r) => r.trim().toLowerCase())
     .filter(Boolean),
@@ -72,10 +79,23 @@ async function main() {
   const statePath = join(STATE_DIR, `${dd.patch}.json`)
   // Début estimé du patch : 36 h avant l'exécution qui le découvre (4 jours au tout premier
   // lancement, pour démarrer avec plus de parties). Les parties d'un autre patch sont ignorées.
-  const firstRun = readdirSync(STATE_DIR).length === 0
-  const state = existsSync(statePath)
-    ? JSON.parse(readFileSync(statePath, 'utf-8'))
-    : emptyState(dd.patch, Math.floor(Date.now() / 1000) - (firstRun ? 96 : 36) * 3600)
+  const previousFiles = readdirSync(STATE_DIR).filter((f) => f.endsWith('.json') && f !== `${dd.patch}.json`)
+  let state
+  if (existsSync(statePath)) {
+    state = upgradeState(JSON.parse(readFileSync(statePath, 'utf-8')))
+  } else {
+    state = emptyState(
+      dd.patch,
+      Math.floor(Date.now() / 1000) - (previousFiles.length === 0 ? 96 : 36) * 3600
+    )
+    // Nouveau patch : on repart des données du patch précédent avec un poids de 25 %, pour avoir
+    // des builds stables dès le premier jour ; les nouvelles parties prennent vite le dessus.
+    if (previousFiles.length > 0) {
+      const prev = upgradeState(JSON.parse(readFileSync(join(STATE_DIR, previousFiles[0]), 'utf-8')))
+      seedFromPrevious(state, prev, 0.25)
+      log(`Nouveau patch : reprise pondérée (25 %) des données du patch ${prev.patch}`)
+    }
+  }
   const processed = new Set(state.processed)
   const deadline = Date.now() + config.minutes * 60_000
   riot.deadline = deadline + 15_000
@@ -105,6 +125,7 @@ async function main() {
         const timeline = await riot.get(region, `/lol/match/v5/matches/${matchId}/timeline`)
         if (!timeline) continue
         for (const rec of extractJunglers(match, timeline, dd)) addRecord(state, rec)
+        addProfiles(state, extractProfiles(match, dd))
         counters.kept++
         if (counters.kept % 100 === 0) {
           log(`${counters.kept} parties analysées (${riot.stats.requests} requêtes)`)
