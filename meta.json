@@ -1,0 +1,1977 @@
+{
+  "patch": "16.21",
+  "generatedAt": "2026-10-26T05:28:10.336Z",
+  "sampleGames": 12386,
+  "freshBuilds": 52,
+  "builds": [
+    {
+      "id": "Aatrox",
+      "archetype": "AD_FIGHTER",
+      "pet": "Scorchclaw Pup",
+      "boots": "Plated Steelcaps",
+      "core": [
+        "Hubris",
+        "Sundered Sky",
+        "Death's Dance"
+      ],
+      "options": [
+        "Serylda's Grudge",
+        "Mortal Reminder",
+        "Maw of Malmortius"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "Conqueror",
+        "primary": [
+          "Triumph",
+          "Legend: Haste",
+          "Last Stand"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Magical Footwear",
+          "Cosmic Insight"
+        ],
+        "shards": [
+          "AF",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 69,
+      "winRate": 0.464
+    },
+    {
+      "id": "Ambessa",
+      "archetype": "AD_FIGHTER",
+      "pet": "Scorchclaw Pup",
+      "boots": "Mercury's Treads",
+      "core": [
+        "Hubris",
+        "Voltaic Cyclosword",
+        "Death's Dance"
+      ],
+      "options": [
+        "Endless Hunger",
+        "Guardian Angel",
+        "Maw of Malmortius"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "Conqueror",
+        "primary": [
+          "Triumph",
+          "Legend: Haste",
+          "Last Stand"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Cosmic Insight",
+          "Cash Back"
+        ],
+        "shards": [
+          "AF",
+          "AF",
+          "HP"
+        ]
+      },
+      "patch": "16.21",
+      "games": 77,
+      "winRate": 0.416
+    },
+    {
+      "id": "Belveth",
+      "archetype": "AD_FIGHTER",
+      "pet": "Mosstomper Seedling",
+      "boots": "Mercury's Treads",
+      "core": [
+        "Kraken Slayer",
+        "Guinsoo's Rageblade",
+        "Terminus"
+      ],
+      "options": [
+        "Guardian Angel",
+        "Wit's End",
+        "Death's Dance"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "Lethal Tempo",
+        "primary": [
+          "Triumph",
+          "Legend: Alacrity",
+          "Coup de Grace"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Cash Back",
+          "Triple Tonic"
+        ],
+        "shards": [
+          "AF",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 201,
+      "winRate": 0.532
+    },
+    {
+      "id": "Briar",
+      "archetype": "AD_CARRY",
+      "pet": "Mosstomper Seedling",
+      "boots": "Mercury's Treads",
+      "core": [
+        "Titanic Hydra",
+        "Black Cleaver",
+        "Death's Dance"
+      ],
+      "options": [
+        "Guardian Angel",
+        "Infinity Edge",
+        "Spirit Visage",
+        "Lord Dominik's Regards",
+        "Endless Hunger"
+      ],
+      "skills": "W>Q>E",
+      "runes": {
+        "keystone": "Press the Attack",
+        "primary": [
+          "Triumph",
+          "Legend: Haste",
+          "Coup de Grace"
+        ],
+        "secondaryTree": "Domination",
+        "secondary": [
+          "Sudden Impact",
+          "Treasure Hunter"
+        ],
+        "shards": [
+          "AF",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 114,
+      "winRate": 0.526
+    },
+    {
+      "id": "Chogath",
+      "archetype": "TANK",
+      "pet": "Gustwalker Hatchling",
+      "boots": "Plated Steelcaps",
+      "core": [
+        "Hextech Rocketbelt",
+        "Dead Man's Plate",
+        "Force of Nature"
+      ],
+      "options": [
+        "Jak'Sho, The Protean",
+        "Thornmail",
+        "Randuin's Omen"
+      ],
+      "skills": "E>W>Q",
+      "runes": {
+        "keystone": "Hail of Blades",
+        "primary": [
+          "Cheap Shot",
+          "Grisly Mementos",
+          "Ultimate Hunter"
+        ],
+        "secondaryTree": "Sorcery",
+        "secondary": [
+          "Axiom Arcanist",
+          "Celerity"
+        ],
+        "shards": [
+          "AS",
+          "MS",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 275,
+      "winRate": 0.484
+    },
+    {
+      "id": "Darius",
+      "archetype": "AD_FIGHTER",
+      "pet": "Gustwalker Hatchling",
+      "boots": "Boots of Swiftness",
+      "core": [
+        "Youmuu's Ghostblade",
+        "Dead Man's Plate",
+        "Death's Dance"
+      ],
+      "options": [
+        "Sterak's Gage",
+        "Randuin's Omen",
+        "Force of Nature"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "Stormraider's Surge",
+        "primary": [
+          "Axiom Arcanist",
+          "Celerity",
+          "Waterwalking"
+        ],
+        "secondaryTree": "Precision",
+        "secondary": [
+          "Triumph",
+          "Legend: Alacrity"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 70,
+      "winRate": 0.529
+    },
+    {
+      "id": "Diana",
+      "archetype": "AP_FIGHTER",
+      "pet": "Gustwalker Hatchling",
+      "boots": "Mercury's Treads",
+      "core": [
+        "Dusk and Dawn",
+        "Riftmaker",
+        "Rabadon's Deathcap"
+      ],
+      "options": [],
+      "skills": "Q>W>E",
+      "runes": {
+        "keystone": "Conqueror",
+        "primary": [
+          "Triumph",
+          "Legend: Alacrity",
+          "Coup de Grace"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Cosmic Insight",
+          "Magical Footwear"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 144,
+      "winRate": 0.563
+    },
+    {
+      "id": "Ekko",
+      "archetype": "AP_BURST",
+      "pet": "Gustwalker Hatchling",
+      "boots": "Mercury's Treads",
+      "core": [
+        "Nashor's Tooth",
+        "Dusk and Dawn",
+        "Rabadon's Deathcap"
+      ],
+      "options": [
+        "Void Staff",
+        "Zhonya's Hourglass"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "Dark Harvest",
+        "primary": [
+          "Sudden Impact",
+          "Grisly Mementos",
+          "Treasure Hunter"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Cosmic Insight",
+          "Magical Footwear"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 300,
+      "winRate": 0.51
+    },
+    {
+      "id": "Elise",
+      "archetype": "AP_BURST",
+      "pet": "Gustwalker Hatchling",
+      "boots": "Sorcerer's Shoes",
+      "core": [
+        "Lich Bane",
+        "Shadowflame",
+        "Rabadon's Deathcap"
+      ],
+      "options": [
+        "Void Staff",
+        "Zhonya's Hourglass",
+        "Banshee's Veil"
+      ],
+      "skills": "Q>W>E",
+      "runes": {
+        "keystone": "Dark Harvest",
+        "primary": [
+          "Cheap Shot",
+          "Grisly Mementos",
+          "Relentless Hunter"
+        ],
+        "secondaryTree": "Precision",
+        "secondary": [
+          "Coup de Grace",
+          "Triumph"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 295,
+      "winRate": 0.508
+    },
+    {
+      "id": "Evelynn",
+      "archetype": "AP_BURST",
+      "pet": "Gustwalker Hatchling",
+      "boots": "Sorcerer's Shoes",
+      "core": [
+        "Lich Bane",
+        "Shadowflame",
+        "Rabadon's Deathcap"
+      ],
+      "options": [
+        "Banshee's Veil",
+        "Void Staff"
+      ],
+      "skills": "Q>W>E",
+      "runes": {
+        "keystone": "Electrocute",
+        "primary": [
+          "Sudden Impact",
+          "Sixth Sense",
+          "Relentless Hunter"
+        ],
+        "secondaryTree": "Precision",
+        "secondary": [
+          "Coup de Grace",
+          "Triumph"
+        ],
+        "shards": [
+          "AF",
+          "AF",
+          "HP"
+        ]
+      },
+      "patch": "16.21",
+      "games": 147,
+      "winRate": 0.456
+    },
+    {
+      "id": "Fiddlesticks",
+      "archetype": "AP_BURST",
+      "pet": "Gustwalker Hatchling",
+      "boots": "Sorcerer's Shoes",
+      "core": [
+        "Malignance",
+        "Shadowflame",
+        "Zhonya's Hourglass"
+      ],
+      "options": [
+        "Rabadon's Deathcap",
+        "Banshee's Veil",
+        "Void Staff"
+      ],
+      "skills": "W>Q>E",
+      "runes": {
+        "keystone": "Electrocute",
+        "primary": [
+          "Sudden Impact",
+          "Grisly Mementos",
+          "Ultimate Hunter"
+        ],
+        "secondaryTree": "Sorcery",
+        "secondary": [
+          "Axiom Arcanist",
+          "Absolute Focus"
+        ],
+        "shards": [
+          "AF",
+          "AF",
+          "HP"
+        ]
+      },
+      "patch": "16.21",
+      "games": 94,
+      "winRate": 0.511
+    },
+    {
+      "id": "Gragas",
+      "archetype": "AP_BURST",
+      "pet": "Scorchclaw Pup",
+      "boots": "Sorcerer's Shoes",
+      "core": [
+        "Lich Bane",
+        "Stormsurge",
+        "Zhonya's Hourglass"
+      ],
+      "options": [],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "Dark Harvest",
+        "primary": [
+          "Sudden Impact",
+          "Grisly Mementos",
+          "Treasure Hunter"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Cosmic Insight",
+          "Magical Footwear"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 45,
+      "winRate": 0.556
+    },
+    {
+      "id": "Graves",
+      "archetype": "AD_CARRY",
+      "pet": "Scorchclaw Pup",
+      "boots": "Mercury's Treads",
+      "core": [
+        "Hubris",
+        "The Collector",
+        "Lord Dominik's Regards"
+      ],
+      "options": [
+        "Immortal Shieldbow",
+        "Infinity Edge",
+        "Guardian Angel"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "Dark Harvest",
+        "primary": [
+          "Sudden Impact",
+          "Grisly Mementos",
+          "Treasure Hunter"
+        ],
+        "secondaryTree": "Precision",
+        "secondary": [
+          "Legend: Alacrity",
+          "Triumph"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 561,
+      "winRate": 0.519
+    },
+    {
+      "id": "Gwen",
+      "archetype": "AP_FIGHTER",
+      "pet": "Gustwalker Hatchling",
+      "boots": "Sorcerer's Shoes",
+      "core": [
+        "Dusk and Dawn",
+        "Shadowflame",
+        "Rabadon's Deathcap"
+      ],
+      "options": [
+        "Void Staff",
+        "Zhonya's Hourglass"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "Conqueror",
+        "primary": [
+          "Triumph",
+          "Legend: Alacrity",
+          "Last Stand"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Cash Back",
+          "Approach Velocity"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 61,
+      "winRate": 0.508
+    },
+    {
+      "id": "Hecarim",
+      "archetype": "AD_FIGHTER",
+      "pet": "Gustwalker Hatchling",
+      "boots": "Gluttonous Greaves",
+      "core": [
+        "Spear of Shojin",
+        "Death's Dance",
+        "Endless Hunger"
+      ],
+      "options": [
+        "Maw of Malmortius",
+        "Black Cleaver",
+        "Serylda's Grudge"
+      ],
+      "skills": "Q>W>E",
+      "runes": {
+        "keystone": "Stormraider's Surge",
+        "primary": [
+          "Nimbus Cloak",
+          "Celerity",
+          "Waterwalking"
+        ],
+        "secondaryTree": "Precision",
+        "secondary": [
+          "Triumph",
+          "Legend: Haste"
+        ],
+        "shards": [
+          "AF",
+          "AF",
+          "HP"
+        ]
+      },
+      "patch": "16.21",
+      "games": 476,
+      "winRate": 0.511
+    },
+    {
+      "id": "Ivern",
+      "archetype": "ENCHANTER",
+      "pet": "Gustwalker Hatchling",
+      "boots": "Ionian Boots of Lucidity",
+      "core": [
+        "Echoes of Helia",
+        "Moonstone Renewer",
+        "Dawncore"
+      ],
+      "options": [
+        "Shurelya's Battlesong",
+        "Staff of Flowing Water",
+        "Redemption",
+        "Mikael's Blessing"
+      ],
+      "skills": "E>Q>W",
+      "runes": {
+        "keystone": "Glacial Augment",
+        "primary": [
+          "Cash Back",
+          "Triple Tonic",
+          "Cosmic Insight"
+        ],
+        "secondaryTree": "Resolve",
+        "secondary": [
+          "Font of Life",
+          "Revitalize"
+        ],
+        "shards": [
+          "AH",
+          "MS",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 135,
+      "winRate": 0.43
+    },
+    {
+      "id": "JarvanIV",
+      "archetype": "AD_FIGHTER",
+      "pet": "Mosstomper Seedling",
+      "boots": "Mercury's Treads",
+      "core": [
+        "Profane Hydra",
+        "Axiom Arc",
+        "Death's Dance"
+      ],
+      "options": [
+        "Guardian Angel"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "Conqueror",
+        "primary": [
+          "Triumph",
+          "Legend: Alacrity",
+          "Coup de Grace"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Cosmic Insight",
+          "Magical Footwear"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 489,
+      "winRate": 0.489
+    },
+    {
+      "id": "Jayce",
+      "archetype": "AD_FIGHTER",
+      "pet": "Scorchclaw Pup",
+      "boots": "Ionian Boots of Lucidity",
+      "core": [
+        "Youmuu's Ghostblade",
+        "Voltaic Cyclosword",
+        "Edge of Night"
+      ],
+      "options": [
+        "Serylda's Grudge",
+        "Lord Dominik's Regards",
+        "Serpent's Fang",
+        "Bastionbreaker",
+        "Guardian Angel"
+      ],
+      "skills": "Q>W>E",
+      "runes": {
+        "keystone": "First Strike",
+        "primary": [
+          "Cash Back",
+          "Triple Tonic",
+          "Cosmic Insight"
+        ],
+        "secondaryTree": "Precision",
+        "secondary": [
+          "Legend: Haste",
+          "Cut Down"
+        ],
+        "shards": [
+          "AF",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 183,
+      "winRate": 0.443
+    },
+    {
+      "id": "Karthus",
+      "archetype": "AP_BURST",
+      "pet": "Scorchclaw Pup",
+      "boots": "Sorcerer's Shoes",
+      "core": [
+        "Blackfire Torch",
+        "Shadowflame",
+        "Rabadon's Deathcap"
+      ],
+      "options": [
+        "Void Staff",
+        "Zhonya's Hourglass",
+        "Morellonomicon"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "Dark Harvest",
+        "primary": [
+          "Cheap Shot",
+          "Sixth Sense",
+          "Treasure Hunter"
+        ],
+        "secondaryTree": "Precision",
+        "secondary": [
+          "Triumph",
+          "Last Stand"
+        ],
+        "shards": [
+          "AH",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 94,
+      "winRate": 0.543
+    },
+    {
+      "id": "Kayn",
+      "archetype": "AD_ASSASSIN",
+      "pet": "Gustwalker Hatchling",
+      "boots": "Ionian Boots of Lucidity",
+      "core": [
+        "Voltaic Cyclosword",
+        "Bastionbreaker",
+        "Lord Dominik's Regards"
+      ],
+      "options": [
+        "Edge of Night",
+        "Serylda's Grudge",
+        "Death's Dance",
+        "Serpent's Fang",
+        "Guardian Angel"
+      ],
+      "skills": "Q>W>E",
+      "runes": {
+        "keystone": "Stormraider's Surge",
+        "primary": [
+          "Axiom Arcanist",
+          "Celerity",
+          "Gathering Storm"
+        ],
+        "secondaryTree": "Domination",
+        "secondary": [
+          "Sudden Impact",
+          "Treasure Hunter"
+        ],
+        "shards": [
+          "AF",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 258,
+      "winRate": 0.504
+    },
+    {
+      "id": "Khazix",
+      "archetype": "AD_ASSASSIN",
+      "pet": "Scorchclaw Pup",
+      "boots": "Plated Steelcaps",
+      "core": [
+        "Hubris",
+        "Voltaic Cyclosword",
+        "Bastionbreaker"
+      ],
+      "options": [
+        "Serylda's Grudge",
+        "Edge of Night",
+        "Serpent's Fang",
+        "Guardian Angel",
+        "Lord Dominik's Regards"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "First Strike",
+        "primary": [
+          "Cash Back",
+          "Triple Tonic",
+          "Cosmic Insight"
+        ],
+        "secondaryTree": "Domination",
+        "secondary": [
+          "Sudden Impact",
+          "Treasure Hunter"
+        ],
+        "shards": [
+          "AF",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 488,
+      "winRate": 0.459
+    },
+    {
+      "id": "Kindred",
+      "archetype": "AD_CARRY",
+      "pet": "Scorchclaw Pup",
+      "boots": "Berserker's Greaves",
+      "core": [
+        "Trinity Force",
+        "The Collector",
+        "Mortal Reminder"
+      ],
+      "options": [
+        "Infinity Edge",
+        "Hexoptics C44",
+        "Guardian Angel",
+        "Lord Dominik's Regards",
+        "Rapid Firecannon",
+        "Immortal Shieldbow"
+      ],
+      "skills": "Q>W>E",
+      "runes": {
+        "keystone": "Press the Attack",
+        "primary": [
+          "Triumph",
+          "Legend: Alacrity",
+          "Coup de Grace"
+        ],
+        "secondaryTree": "Domination",
+        "secondary": [
+          "Sudden Impact",
+          "Treasure Hunter"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HP"
+        ]
+      },
+      "patch": "16.21",
+      "games": 286,
+      "winRate": 0.476
+    },
+    {
+      "id": "LeeSin",
+      "archetype": "AD_FIGHTER",
+      "pet": "Scorchclaw Pup",
+      "boots": "Mercury's Treads",
+      "core": [
+        "Profane Hydra",
+        "Voltaic Cyclosword",
+        "Edge of Night"
+      ],
+      "options": [
+        "Guardian Angel",
+        "Maw of Malmortius"
+      ],
+      "skills": "Q>W>E",
+      "runes": {
+        "keystone": "Conqueror",
+        "primary": [
+          "Triumph",
+          "Legend: Alacrity",
+          "Coup de Grace"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Magical Footwear",
+          "Cosmic Insight"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 778,
+      "winRate": 0.488
+    },
+    {
+      "id": "Lillia",
+      "archetype": "AP_FIGHTER",
+      "pet": "Mosstomper Seedling",
+      "boots": "Sorcerer's Shoes",
+      "core": [
+        "Liandry's Torment",
+        "Riftmaker",
+        "Zhonya's Hourglass"
+      ],
+      "options": [
+        "Rabadon's Deathcap",
+        "Rylai's Crystal Scepter",
+        "Bloodletter's Curse"
+      ],
+      "skills": "Q>W>E",
+      "runes": {
+        "keystone": "Conqueror",
+        "primary": [
+          "Triumph",
+          "Legend: Haste",
+          "Coup de Grace"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Cosmic Insight",
+          "Magical Footwear"
+        ],
+        "shards": [
+          "AF",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 333,
+      "winRate": 0.559
+    },
+    {
+      "id": "Locke",
+      "archetype": "AP_BURST",
+      "pet": "Scorchclaw Pup",
+      "boots": "Sorcerer's Shoes",
+      "core": [
+        "Lich Bane",
+        "Shadowflame",
+        "Zhonya's Hourglass"
+      ],
+      "options": [
+        "Void Staff",
+        "Rabadon's Deathcap",
+        "Banshee's Veil"
+      ],
+      "skills": "Q>W>E",
+      "runes": {
+        "keystone": "Dark Harvest",
+        "primary": [
+          "Sudden Impact",
+          "Sixth Sense",
+          "Treasure Hunter"
+        ],
+        "secondaryTree": "Precision",
+        "secondary": [
+          "Triumph",
+          "Coup de Grace"
+        ],
+        "shards": [
+          "AF",
+          "AF",
+          "HP"
+        ]
+      },
+      "patch": "16.21",
+      "games": 103,
+      "winRate": 0.515
+    },
+    {
+      "id": "MasterYi",
+      "archetype": "AD_CARRY",
+      "pet": "Gustwalker Hatchling",
+      "boots": "Gluttonous Greaves",
+      "core": [
+        "Kraken Slayer",
+        "The Collector",
+        "Infinity Edge"
+      ],
+      "options": [
+        "Death's Dance",
+        "Lord Dominik's Regards",
+        "Immortal Shieldbow",
+        "Guardian Angel"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "Hail of Blades",
+        "primary": [
+          "Sudden Impact",
+          "Grisly Mementos",
+          "Treasure Hunter"
+        ],
+        "secondaryTree": "Precision",
+        "secondary": [
+          "Legend: Alacrity",
+          "Triumph"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 218,
+      "winRate": 0.472
+    },
+    {
+      "id": "MonkeyKing",
+      "archetype": "AD_FIGHTER",
+      "pet": "Scorchclaw Pup",
+      "boots": "Plated Steelcaps",
+      "core": [
+        "Trinity Force",
+        "Black Cleaver",
+        "Death's Dance"
+      ],
+      "options": [
+        "Guardian Angel",
+        "Maw of Malmortius"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "Conqueror",
+        "primary": [
+          "Triumph",
+          "Legend: Alacrity",
+          "Last Stand"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Magical Footwear",
+          "Cosmic Insight"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 306,
+      "winRate": 0.526
+    },
+    {
+      "id": "Naafiri",
+      "archetype": "AD_ASSASSIN",
+      "pet": "Scorchclaw Pup",
+      "boots": "Ionian Boots of Lucidity",
+      "core": [
+        "Voltaic Cyclosword",
+        "Black Cleaver",
+        "Death's Dance"
+      ],
+      "options": [
+        "Guardian Angel",
+        "Edge of Night",
+        "Maw of Malmortius",
+        "Endless Hunger",
+        "Serylda's Grudge"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "Conqueror",
+        "primary": [
+          "Triumph",
+          "Legend: Alacrity",
+          "Coup de Grace"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Cosmic Insight",
+          "Magical Footwear"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 156,
+      "winRate": 0.468
+    },
+    {
+      "id": "Nidalee",
+      "archetype": "AP_BURST",
+      "pet": "Scorchclaw Pup",
+      "boots": "Ionian Boots of Lucidity",
+      "core": [
+        "Lich Bane",
+        "Hextech Rocketbelt",
+        "Zhonya's Hourglass"
+      ],
+      "options": [
+        "Rabadon's Deathcap",
+        "Void Staff"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "Dark Harvest",
+        "primary": [
+          "Sudden Impact",
+          "Sixth Sense",
+          "Treasure Hunter"
+        ],
+        "secondaryTree": "Sorcery",
+        "secondary": [
+          "Transcendence",
+          "Waterwalking"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HP"
+        ]
+      },
+      "patch": "16.21",
+      "games": 317,
+      "winRate": 0.527
+    },
+    {
+      "id": "Nocturne",
+      "archetype": "AD_ASSASSIN",
+      "pet": "Scorchclaw Pup",
+      "boots": "Mercury's Treads",
+      "core": [
+        "Profane Hydra",
+        "Axiom Arc",
+        "Voltaic Cyclosword"
+      ],
+      "options": [
+        "Guardian Angel",
+        "Death's Dance",
+        "Lord Dominik's Regards"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "Hail of Blades",
+        "primary": [
+          "Sudden Impact",
+          "Grisly Mementos",
+          "Ultimate Hunter"
+        ],
+        "secondaryTree": "Precision",
+        "secondary": [
+          "Legend: Alacrity",
+          "Triumph"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 130,
+      "winRate": 0.438
+    },
+    {
+      "id": "Nunu",
+      "archetype": "TANK",
+      "pet": "Gustwalker Hatchling",
+      "boots": "Mercury's Treads",
+      "core": [
+        "Liandry's Torment",
+        "Dead Man's Plate",
+        "Spirit Visage"
+      ],
+      "options": [],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "Electrocute",
+        "primary": [
+          "Cheap Shot",
+          "Grisly Mementos",
+          "Relentless Hunter"
+        ],
+        "secondaryTree": "Sorcery",
+        "secondary": [
+          "Celerity",
+          "Waterwalking"
+        ],
+        "shards": [
+          "AF",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 212,
+      "winRate": 0.491
+    },
+    {
+      "id": "Pantheon",
+      "archetype": "AD_FIGHTER",
+      "pet": "Scorchclaw Pup",
+      "boots": "Plated Steelcaps",
+      "core": [
+        "Voltaic Cyclosword",
+        "Bastionbreaker",
+        "Edge of Night"
+      ],
+      "options": [
+        "Guardian Angel",
+        "Death's Dance"
+      ],
+      "skills": "Q>W>E",
+      "runes": {
+        "keystone": "Conqueror",
+        "primary": [
+          "Triumph",
+          "Legend: Alacrity",
+          "Coup de Grace"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Cosmic Insight",
+          "Magical Footwear"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 52,
+      "winRate": 0.558
+    },
+    {
+      "id": "Qiyana",
+      "archetype": "AD_ASSASSIN",
+      "pet": "Scorchclaw Pup",
+      "boots": "Mercury's Treads",
+      "core": [
+        "Umbral Glaive",
+        "Voltaic Cyclosword",
+        "Bastionbreaker"
+      ],
+      "options": [
+        "Serylda's Grudge",
+        "Edge of Night",
+        "Guardian Angel",
+        "Lord Dominik's Regards",
+        "Serpent's Fang",
+        "Death's Dance"
+      ],
+      "skills": "Q>W>E",
+      "runes": {
+        "keystone": "First Strike",
+        "primary": [
+          "Cash Back",
+          "Triple Tonic",
+          "Cosmic Insight"
+        ],
+        "secondaryTree": "Domination",
+        "secondary": [
+          "Sudden Impact",
+          "Treasure Hunter"
+        ],
+        "shards": [
+          "AF",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 538,
+      "winRate": 0.526
+    },
+    {
+      "id": "Quinn",
+      "archetype": "AD_FIGHTER",
+      "pet": "Scorchclaw Pup",
+      "boots": "Plated Steelcaps",
+      "core": [
+        "Profane Hydra",
+        "Edge of Night",
+        "The Collector"
+      ],
+      "options": [
+        "Infinity Edge",
+        "Lord Dominik's Regards",
+        "Immortal Shieldbow"
+      ],
+      "skills": "W>Q>E",
+      "runes": {
+        "keystone": "Electrocute",
+        "primary": [
+          "Sudden Impact",
+          "Grisly Mementos",
+          "Treasure Hunter"
+        ],
+        "secondaryTree": "Sorcery",
+        "secondary": [
+          "Absolute Focus",
+          "Gathering Storm"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 50,
+      "winRate": 0.62
+    },
+    {
+      "id": "Rammus",
+      "archetype": "TANK",
+      "pet": "Scorchclaw Pup",
+      "boots": "Mercury's Treads",
+      "core": [
+        "Thornmail",
+        "Protoplasm Harness",
+        "Jak'Sho, The Protean"
+      ],
+      "options": [
+        "Kaenic Rookern"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "Aftershock",
+        "primary": [
+          "Font of Life",
+          "Conditioning",
+          "Unflinching"
+        ],
+        "secondaryTree": "Sorcery",
+        "secondary": [
+          "Celerity",
+          "Waterwalking"
+        ],
+        "shards": [
+          "AS",
+          "HS",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 57,
+      "winRate": 0.474
+    },
+    {
+      "id": "RekSai",
+      "archetype": "AD_FIGHTER",
+      "pet": "Scorchclaw Pup",
+      "boots": "Mercury's Treads",
+      "core": [
+        "Titanic Hydra",
+        "Spear of Shojin",
+        "Sterak's Gage"
+      ],
+      "options": [
+        "Mortal Reminder",
+        "Randuin's Omen"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "Conqueror",
+        "primary": [
+          "Triumph",
+          "Legend: Alacrity",
+          "Coup de Grace"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Magical Footwear",
+          "Cosmic Insight"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HP"
+        ]
+      },
+      "patch": "16.21",
+      "games": 182,
+      "winRate": 0.467
+    },
+    {
+      "id": "Rengar",
+      "archetype": "AD_ASSASSIN",
+      "pet": "Gustwalker Hatchling",
+      "boots": "Boots of Swiftness",
+      "core": [
+        "Umbral Glaive",
+        "Profane Hydra",
+        "Serpent's Fang"
+      ],
+      "options": [
+        "Lord Dominik's Regards",
+        "Infinity Edge",
+        "Edge of Night",
+        "Guardian Angel"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "Fleet Footwork",
+        "primary": [
+          "Triumph",
+          "Legend: Alacrity",
+          "Cut Down"
+        ],
+        "secondaryTree": "Domination",
+        "secondary": [
+          "Sudden Impact",
+          "Relentless Hunter"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 325,
+      "winRate": 0.486
+    },
+    {
+      "id": "Sejuani",
+      "archetype": "TANK",
+      "pet": "Scorchclaw Pup",
+      "boots": "Mercury's Treads",
+      "core": [
+        "Heartsteel",
+        "Unending Despair",
+        "Kaenic Rookern"
+      ],
+      "options": [
+        "Frozen Heart",
+        "Jak'Sho, The Protean"
+      ],
+      "skills": "W>Q>E",
+      "runes": {
+        "keystone": "Aftershock",
+        "primary": [
+          "Font of Life",
+          "Conditioning",
+          "Overgrowth"
+        ],
+        "secondaryTree": "Precision",
+        "secondary": [
+          "Legend: Alacrity",
+          "Triumph"
+        ],
+        "shards": [
+          "AS",
+          "HS",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 91,
+      "winRate": 0.56
+    },
+    {
+      "id": "Shaco",
+      "archetype": "AP_BURST",
+      "pet": "Gustwalker Hatchling",
+      "boots": "Ionian Boots of Lucidity",
+      "core": [
+        "Youmuu's Ghostblade",
+        "Voltaic Cyclosword",
+        "Lord Dominik's Regards"
+      ],
+      "options": [
+        "Infinity Edge",
+        "Cryptbloom",
+        "Guardian Angel",
+        "Serpent's Fang"
+      ],
+      "skills": "W>E>Q",
+      "runes": {
+        "keystone": "Arcane Comet",
+        "primary": [
+          "Axiom Arcanist",
+          "Transcendence",
+          "Gathering Storm"
+        ],
+        "secondaryTree": "Precision",
+        "secondary": [
+          "Legend: Haste",
+          "Cut Down"
+        ],
+        "shards": [
+          "AH",
+          "AF",
+          "HP"
+        ]
+      },
+      "patch": "16.21",
+      "games": 213,
+      "winRate": 0.559
+    },
+    {
+      "id": "Shyvana",
+      "archetype": "AD_FIGHTER",
+      "pet": "Scorchclaw Pup",
+      "boots": "Plated Steelcaps",
+      "core": [
+        "Experimental Hexplate",
+        "Spear of Shojin",
+        "Death's Dance"
+      ],
+      "options": [
+        "Jak'Sho, The Protean",
+        "Randuin's Omen"
+      ],
+      "skills": "Q>W>E",
+      "runes": {
+        "keystone": "Press the Attack",
+        "primary": [
+          "Triumph",
+          "Legend: Haste",
+          "Last Stand"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Cosmic Insight",
+          "Magical Footwear"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 137,
+      "winRate": 0.496
+    },
+    {
+      "id": "Skarner",
+      "archetype": "TANK",
+      "pet": "Scorchclaw Pup",
+      "boots": "Plated Steelcaps",
+      "core": [
+        "Heartsteel",
+        "Unending Despair",
+        "Spirit Visage"
+      ],
+      "options": [
+        "Randuin's Omen",
+        "Kaenic Rookern"
+      ],
+      "skills": "Q>W>E",
+      "runes": {
+        "keystone": "Grasp of the Undying",
+        "primary": [
+          "Shield Bash",
+          "Conditioning",
+          "Overgrowth"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Magical Footwear",
+          "Approach Velocity"
+        ],
+        "shards": [
+          "AH",
+          "HS",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 89,
+      "winRate": 0.528
+    },
+    {
+      "id": "Sylas",
+      "archetype": "AP_FIGHTER",
+      "pet": "Scorchclaw Pup",
+      "boots": "Sorcerer's Shoes",
+      "core": [
+        "Lich Bane",
+        "Riftmaker",
+        "Zhonya's Hourglass"
+      ],
+      "options": [
+        "Rabadon's Deathcap",
+        "Shadowflame"
+      ],
+      "skills": "W>E>Q",
+      "runes": {
+        "keystone": "Conqueror",
+        "primary": [
+          "Triumph",
+          "Legend: Haste",
+          "Last Stand"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Cosmic Insight",
+          "Magical Footwear"
+        ],
+        "shards": [
+          "AF",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 448,
+      "winRate": 0.464
+    },
+    {
+      "id": "Taliyah",
+      "archetype": "AP_BURST",
+      "pet": "Scorchclaw Pup",
+      "boots": "Sorcerer's Shoes",
+      "core": [
+        "Blackfire Torch",
+        "Liandry's Torment",
+        "Zhonya's Hourglass"
+      ],
+      "options": [
+        "Rabadon's Deathcap",
+        "Void Staff",
+        "Cryptbloom",
+        "Banshee's Veil"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "First Strike",
+        "primary": [
+          "Cash Back",
+          "Triple Tonic",
+          "Cosmic Insight"
+        ],
+        "secondaryTree": "Domination",
+        "secondary": [
+          "Cheap Shot",
+          "Treasure Hunter"
+        ],
+        "shards": [
+          "AF",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 269,
+      "winRate": 0.546
+    },
+    {
+      "id": "Talon",
+      "archetype": "AD_ASSASSIN",
+      "pet": "Gustwalker Hatchling",
+      "boots": "Mercury's Treads",
+      "core": [
+        "Youmuu's Ghostblade",
+        "Voltaic Cyclosword",
+        "Edge of Night"
+      ],
+      "options": [
+        "Lord Dominik's Regards",
+        "Serylda's Grudge",
+        "Serpent's Fang",
+        "Guardian Angel",
+        "Death's Dance",
+        "Mortal Reminder"
+      ],
+      "skills": "W>Q>E",
+      "runes": {
+        "keystone": "Fleet Footwork",
+        "primary": [
+          "Triumph",
+          "Legend: Alacrity",
+          "Coup de Grace"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Magical Footwear",
+          "Cosmic Insight"
+        ],
+        "shards": [
+          "AF",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 488,
+      "winRate": 0.52
+    },
+    {
+      "id": "Udyr",
+      "archetype": "AD_FIGHTER",
+      "pet": "Scorchclaw Pup",
+      "boots": "Boots of Swiftness",
+      "core": [
+        "Liandry's Torment",
+        "Dead Man's Plate",
+        "Randuin's Omen"
+      ],
+      "options": [
+        "Spirit Visage",
+        "Jak'Sho, The Protean",
+        "Sterak's Gage",
+        "Frozen Heart"
+      ],
+      "skills": "W>E>Q",
+      "runes": {
+        "keystone": "Press the Attack",
+        "primary": [
+          "Triumph",
+          "Legend: Haste",
+          "Coup de Grace"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Approach Velocity",
+          "Magical Footwear"
+        ],
+        "shards": [
+          "AF",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 105,
+      "winRate": 0.448
+    },
+    {
+      "id": "Vi",
+      "archetype": "AD_FIGHTER",
+      "pet": "Gustwalker Hatchling",
+      "boots": "Mercury's Treads",
+      "core": [
+        "Trinity Force",
+        "Black Cleaver",
+        "Guardian Angel"
+      ],
+      "options": [
+        "Death's Dance"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "Conqueror",
+        "primary": [
+          "Triumph",
+          "Legend: Haste",
+          "Coup de Grace"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Cosmic Insight",
+          "Magical Footwear"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 252,
+      "winRate": 0.48
+    },
+    {
+      "id": "Viego",
+      "archetype": "AD_FIGHTER",
+      "pet": "Scorchclaw Pup",
+      "boots": "Plated Steelcaps",
+      "core": [
+        "Kraken Slayer",
+        "The Collector",
+        "Immortal Shieldbow"
+      ],
+      "options": [
+        "Infinity Edge",
+        "Lord Dominik's Regards",
+        "Guardian Angel",
+        "Death's Dance"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "Conqueror",
+        "primary": [
+          "Triumph",
+          "Legend: Alacrity",
+          "Coup de Grace"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Magical Footwear",
+          "Cosmic Insight"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 406,
+      "winRate": 0.47
+    },
+    {
+      "id": "Warwick",
+      "archetype": "AD_FIGHTER",
+      "pet": "Mosstomper Seedling",
+      "boots": "Mercury's Treads",
+      "core": [
+        "Stridebreaker",
+        "Blade of The Ruined King",
+        "Guardian Angel"
+      ],
+      "options": [],
+      "skills": "Q>W>E",
+      "runes": {
+        "keystone": "Lethal Tempo",
+        "primary": [
+          "Triumph",
+          "Legend: Alacrity",
+          "Last Stand"
+        ],
+        "secondaryTree": "Sorcery",
+        "secondary": [
+          "Celerity",
+          "Waterwalking"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 45,
+      "winRate": 0.4
+    },
+    {
+      "id": "XinZhao",
+      "archetype": "AD_FIGHTER",
+      "pet": "Scorchclaw Pup",
+      "boots": "Plated Steelcaps",
+      "core": [
+        "Titanic Hydra",
+        "Black Cleaver",
+        "Death's Dance"
+      ],
+      "options": [
+        "Guardian Angel"
+      ],
+      "skills": "W>E>Q",
+      "runes": {
+        "keystone": "Conqueror",
+        "primary": [
+          "Triumph",
+          "Legend: Alacrity",
+          "Coup de Grace"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Cosmic Insight",
+          "Magical Footwear"
+        ],
+        "shards": [
+          "AS",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 294,
+      "winRate": 0.497
+    },
+    {
+      "id": "Zac",
+      "archetype": "TANK",
+      "pet": "Mosstomper Seedling",
+      "boots": "Ionian Boots of Lucidity",
+      "core": [
+        "Sunfire Aegis",
+        "Spirit Visage",
+        "Randuin's Omen"
+      ],
+      "options": [
+        "Thornmail",
+        "Jak'Sho, The Protean",
+        "Kaenic Rookern"
+      ],
+      "skills": "E>W>Q",
+      "runes": {
+        "keystone": "Conqueror",
+        "primary": [
+          "Triumph",
+          "Legend: Haste",
+          "Last Stand"
+        ],
+        "secondaryTree": "Inspiration",
+        "secondary": [
+          "Cosmic Insight",
+          "Magical Footwear"
+        ],
+        "shards": [
+          "AH",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 129,
+      "winRate": 0.535
+    },
+    {
+      "id": "Zed",
+      "archetype": "AD_ASSASSIN",
+      "pet": "Scorchclaw Pup",
+      "boots": "Mercury's Treads",
+      "core": [
+        "Hubris",
+        "Voltaic Cyclosword",
+        "Bastionbreaker"
+      ],
+      "options": [
+        "Edge of Night",
+        "Serpent's Fang",
+        "Endless Hunger",
+        "Axiom Arc",
+        "Lord Dominik's Regards",
+        "Death's Dance"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "First Strike",
+        "primary": [
+          "Cash Back",
+          "Triple Tonic",
+          "Cosmic Insight"
+        ],
+        "secondaryTree": "Domination",
+        "secondary": [
+          "Sudden Impact",
+          "Treasure Hunter"
+        ],
+        "shards": [
+          "AF",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 86,
+      "winRate": 0.372
+    },
+    {
+      "id": "Zyra",
+      "archetype": "AP_BURST",
+      "pet": "Scorchclaw Pup",
+      "boots": "Sorcerer's Shoes",
+      "core": [
+        "Liandry's Torment",
+        "Rylai's Crystal Scepter",
+        "Shadowflame"
+      ],
+      "options": [
+        "Rabadon's Deathcap",
+        "Banshee's Veil",
+        "Zhonya's Hourglass"
+      ],
+      "skills": "Q>E>W",
+      "runes": {
+        "keystone": "Electrocute",
+        "primary": [
+          "Cheap Shot",
+          "Sixth Sense",
+          "Treasure Hunter"
+        ],
+        "secondaryTree": "Precision",
+        "secondary": [
+          "Cut Down",
+          "Legend: Haste"
+        ],
+        "shards": [
+          "AH",
+          "AF",
+          "HS"
+        ]
+      },
+      "patch": "16.21",
+      "games": 231,
+      "winRate": 0.554
+    }
+  ]
+}
