@@ -64,6 +64,42 @@ export function skillOrder(events) {
 }
 
 /**
+ * Repères de jeu d'un jungler : farm, or et niveau à 10/15 min, minute des deux premiers objets
+ * légendaires, participation aux éliminations, vision et balises de contrôle.
+ */
+export function benchOf(info, p, timeline, events, dd) {
+  const frames = timeline?.info?.frames ?? []
+  const at = (min) => frames[min]?.participantFrames?.[String(p.participantId)] ?? null
+  const cs = (f) => (f ? (Number(f.minionsKilled) || 0) + (Number(f.jungleMinionsKilled) || 0) : null)
+  const f10 = at(10)
+  const f15 = at(15)
+  const legendaryTimes = []
+  const seen = new Set()
+  for (const e of events) {
+    if (e.type !== 'ITEM_PURCHASED' || seen.has(e.itemId)) continue
+    if (!dd.items.get(e.itemId)?.isLegendary) continue
+    seen.add(e.itemId)
+    legendaryTimes.push((e.timestamp ?? 0) / 60000)
+    if (legendaryTimes.length === 2) break
+  }
+  const minutes = (info.gameDuration ?? 0) / 60
+  const teamKills = info.participants
+    .filter((x) => x.teamId === p.teamId)
+    .reduce((s, x) => s + (Number(x.kills) || 0), 0)
+  return {
+    cs10: cs(f10),
+    cs15: cs(f15),
+    gold15: f15 ? Number(f15.totalGold) || 0 : null,
+    level15: f15 ? Number(f15.level) || 0 : null,
+    firstItem: legendaryTimes[0] ?? null,
+    secondItem: legendaryTimes[1] ?? null,
+    kp: teamKills > 0 ? ((Number(p.kills) || 0) + (Number(p.assists) || 0)) / teamKills : null,
+    visionPerMin: minutes > 0 ? (Number(p.visionScore) || 0) / minutes : null,
+    controlWardsPer10: minutes > 0 ? ((Number(p.visionWardsBoughtInGame) || 0) / minutes) * 10 : null
+  }
+}
+
+/**
  * @returns {{ champ: string, win: boolean, runeSig: string|null, core: number[], later: number[],
  *   boots: number|null, pet: number|null, skills: string|null }[]}
  */
@@ -97,8 +133,10 @@ export function extractJunglers(match, timeline, dd) {
     const sum = (f) => foes.reduce((acc, x) => acc + (Number(x[f]) || 0), 0)
     const enemyJungler = foes.find((x) => x.teamPosition === 'JUNGLE')
 
+    const myEvents = events.get(p.participantId) ?? []
     records.push({
       champ,
+      bench: benchOf(info, p, timeline, myEvents, dd),
       win: Boolean(p.win),
       runeSig,
       core: legendaries.slice(0, 3),

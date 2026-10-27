@@ -19,7 +19,9 @@ grâce à l'API officielle de Riot. Le résultat, `meta.json`, est lu par l'Anal
    (équipe très AP, très AD, beaucoup de soins, très résistante, beaucoup de contrôles).
 6. Calcule le taux de victoire de chaque jungler et de chaque affrontement de junglers
    (conseils de pick et de ban dans l'app).
-7. Écrit `meta.json`. Les champions qui n'ont pas encore assez de parties sur le nouveau patch
+7. Calcule les repères Master+ de chaque jungler (farm et or à 10/15 min, minute des deux
+   premiers objets, participation, vision) utilisés par le bilan d'après-partie de l'app.
+8. Écrit `meta.json`. Les champions qui n'ont pas encore assez de parties sur le nouveau patch
    gardent leur build du patch précédent (l'app prend alors les runes recommandées par Riot).
 
 Les compteurs du patch sont conservés dans `state/` : chaque exécution ajoute de nouvelles parties,

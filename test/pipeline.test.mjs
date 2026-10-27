@@ -102,7 +102,11 @@ function fakeGame(win, coreIds, boots = 3047) {
     timeCCingOthers: 20,
     totalDamageShieldedOnTeammates: 0,
     item0: coreIds[0],
-    item1: coreIds[1] ?? 0
+    item1: coreIds[1] ?? 0,
+    kills: 4,
+    assists: 6,
+    visionScore: 30,
+    visionWardsBoughtInGame: 4
   }))
   const ev = (type, extra, t) => ({ type, participantId: 1, timestamp: t, ...extra })
   const events = [
@@ -121,7 +125,18 @@ function fakeGame(win, coreIds, boots = 3047) {
     )
   return [
     { info: { queueId: 420, gameVersion: '16.21.712.1', gameDuration: 1800, participants } },
-    { info: { frames: [{ events: [...events, ...skills] }] } }
+    {
+      info: {
+        frames: [
+          ...Array.from({ length: 16 }, (_, m) => ({
+            events: m === 0 ? [...events, ...skills] : [],
+            participantFrames: {
+              1: { minionsKilled: 4 * m, jungleMinionsKilled: 3 * m, totalGold: 400 * m, level: m }
+            }
+          }))
+        ]
+      }
+    }
   ]
 }
 
@@ -244,7 +259,16 @@ test('meta v2 : profils, stats de junglers, objets par contexte, reprise du patc
   assert.equal(meta.junglers.LeeSin.vs.MonkeyKing[0], 60)
   const profiles = buildProfiles(state, 30)
   assert.ok(profiles.LeeSin && profiles.LeeSin.ap < 0.2)
+  // Repères Master+ pour le bilan d'après-partie.
+  const lb = meta.benchmarks.LeeSin
+  assert.equal(lb.cs10, 70)
+  assert.equal(lb.gold15, 6000)
+  assert.equal(lb.kp, 0.5)
+  assert.equal(lb.visionPerMin, 1)
+  assert.ok(lb.firstItem <= lb.secondItem && typeof lb.controlWardsPer10 === "number")
+  assert.ok(meta.benchmarks._all.cs10 === 70)
   const seeded = seedFromPrevious(emptyState('16.22', 0), state, 0.25)
   assert.equal(seeded.champs.LeeSin.g, 15)
+  assert.equal(seeded.champs.LeeSin.bench.cs10[1] / seeded.champs.LeeSin.bench.cs10[0], 70)
   assert.equal(seeded.seededFrom, '16.21')
 })

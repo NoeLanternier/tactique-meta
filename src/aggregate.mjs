@@ -46,8 +46,22 @@ function champState(state, champ) {
   for (const k of ['runes', 'c1', 'c2', 'c3', 'boots', 'pet', 'later', 'skills', 'vs', 'ctxBase'])
     c[k] ??= {}
   c.ctxItems ??= {}
+  c.bench ??= {}
   return c
 }
+
+/** Repères mesurés : somme et nombre de valeurs pour chaque indicateur. */
+export const BENCH_KEYS = [
+  'cs10',
+  'cs15',
+  'gold15',
+  'level15',
+  'firstItem',
+  'secondItem',
+  'kp',
+  'visionPerMin',
+  'controlWardsPer10'
+]
 
 /** Statistiques glissantes (moyenne/écart-type) d'un indicateur adverse par minute. */
 function observe(state, metric, value) {
@@ -96,6 +110,13 @@ export function addRecord(state, rec) {
   inc(c.pet, rec.pet === null ? null : String(rec.pet), rec.win)
   inc(c.skills, rec.skills, rec.win)
   if (rec.enemyJungler) inc(c.vs, rec.enemyJungler, rec.win)
+  for (const k of BENCH_KEYS) {
+    const v = rec.bench?.[k]
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue
+    const cell = (c.bench[k] ??= [0, 0])
+    cell[0] += 1
+    cell[1] += v
+  }
   for (const ctx of contextsOf(state, rec.enemy)) {
     inc(c.ctxBase, ctx, rec.win)
     const items = (c.ctxItems[ctx] ??= {})
@@ -134,6 +155,8 @@ export function seedFromPrevious(state, previous, factor = 0.25) {
     for (const k of ['runes', 'c1', 'c2', 'c3', 'boots', 'pet', 'later', 'skills', 'vs', 'ctxBase'])
       n[k] = scaleMap(c[k])
     for (const [ctx, m] of Object.entries(c.ctxItems ?? {})) n.ctxItems[ctx] = scaleMap(m)
+    // Repères : n et somme réduits ensemble, la moyenne est conservée.
+    n.bench = scaleMap(c.bench)
     state.champs[champ] = n
   }
   for (const [champ, p] of Object.entries(previous.profiles ?? {})) {
@@ -317,6 +340,44 @@ export function buildJunglerStats(state, minGames = 20) {
 }
 
 /**
+ * Repères Master+ par champion (moyennes du patch) et pour l'ensemble des junglers ('_all').
+ * Utilisés par le bilan d'après-partie de l'app.
+ */
+export function buildBenchmarks(state, minGames = 30) {
+  const out = {}
+  const all = {}
+  let allGames = 0
+  for (const [champ, c] of Object.entries(state.champs)) {
+    const b = c.bench ?? {}
+    for (const k of BENCH_KEYS) {
+      const [n, sum] = b[k] ?? [0, 0]
+      const cell = (all[k] ??= [0, 0])
+      cell[0] += n
+      cell[1] += sum
+    }
+    allGames += c.g
+    if (c.g < minGames) continue
+    const row = { games: Math.round(c.g) }
+    let ok = true
+    for (const k of BENCH_KEYS) {
+      const [n, sum] = b[k] ?? [0, 0]
+      if (n < Math.min(10, minGames)) ok = false
+      else row[k] = round3(sum / n)
+    }
+    if (ok) out[champ] = row
+  }
+  const total = { games: Math.round(allGames) }
+  let ok = allGames >= minGames
+  for (const k of BENCH_KEYS) {
+    const [n, sum] = all[k] ?? [0, 0]
+    if (n < 10) ok = false
+    else total[k] = round3(sum / n)
+  }
+  if (ok) out._all = total
+  return out
+}
+
+/**
  * Construit meta.json : builds du patch en cours, complétés par les builds du patch précédent pour
  * les champions qui n'ont pas encore assez de parties (ils gardent leur numéro de patch, ce qui
  * permet à l'app de prendre les runes recommandées par Riot pour eux).
@@ -341,6 +402,11 @@ export function buildMeta(state, dd, previousMeta, options = {}) {
     builds: [...builds, ...kept].sort((a, b) => a.id.localeCompare(b.id)),
     // Si trop peu de parties (début de patch), on garde les profils précédents.
     profiles: Object.keys(profiles).length >= 50 ? profiles : (previousMeta?.profiles ?? profiles),
-    junglers: buildJunglerStats(state)
+    junglers: buildJunglerStats(state),
+    // Début de patch : on garde les repères précédents tant qu'il n'y a pas assez de parties.
+    benchmarks: (() => {
+      const b = buildBenchmarks(state)
+      return b._all ? b : (previousMeta?.benchmarks ?? b)
+    })()
   }
 }
