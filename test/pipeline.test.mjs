@@ -257,6 +257,12 @@ test('meta v2 : profils, stats de junglers, objets par contexte, reprise du patc
   assert.ok(lee.situational.ap.items.some((x) => x.item === 'Guardian Angel'))
   assert.equal(meta.junglers.LeeSin.games, 60)
   assert.equal(meta.junglers.LeeSin.vs.MonkeyKing[0], 60)
+  // Alliés et adversaires hors jungler (ici, 4 fois le même champion de chaque côté).
+  const [ally] = Object.keys(meta.junglers.LeeSin.with)
+  assert.ok(ally && !('LeeSin' in meta.junglers.LeeSin.with))
+  assert.equal(meta.junglers.LeeSin.with[ally][1], meta.junglers.LeeSin.winRate)
+  assert.ok(!('MonkeyKing' in meta.junglers.LeeSin.against))
+  assert.equal(Object.keys(meta.junglers.LeeSin.against).length, 1)
   const profiles = buildProfiles(state, 30)
   assert.ok(profiles.LeeSin && profiles.LeeSin.ap < 0.2)
   // Repères Master+ pour le bilan d'après-partie.
