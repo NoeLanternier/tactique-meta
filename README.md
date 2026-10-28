@@ -17,8 +17,9 @@ grâce à l'API officielle de Riot. Le résultat, `meta.json`, est lu par l'Anal
 5. Mesure le vrai profil de chaque champion, tous postes confondus (part de dégâts magiques,
    résistance, contrôles, soins, boucliers), et la performance des objets selon le contexte adverse
    (équipe très AP, très AD, beaucoup de soins, très résistante, beaucoup de contrôles).
-6. Calcule le taux de victoire de chaque jungler et de chaque affrontement de junglers
-   (conseils de pick et de ban dans l'app).
+6. Calcule le taux de victoire de chaque jungler, de chaque affrontement de junglers, avec chaque
+   champion allié et contre chaque adversaire (conseils de pick et de ban dans l'app, qui ne
+   tiennent compte que des champions déjà choisis pendant la draft).
 7. Calcule les repères Master+ de chaque jungler (farm et or à 10/15 min, minute des deux
    premiers objets, participation, vision) utilisés par le bilan d'après-partie de l'app.
 8. Écrit `meta.json`. Les champions qui n'ont pas encore assez de parties sur le nouveau patch
