@@ -5,7 +5,7 @@
 // une part minimale des parties du champion pour être retenue.
 import { ARCHETYPES, guessArchetype } from './archetypes.mjs'
 
-export const STATE_VERSION = 2
+export const STATE_VERSION = 3
 /** Contextes adverses pour lesquels on mesure la performance des objets. */
 export const CONTEXTS = ['all', 'ap', 'ad', 'heal', 'tank', 'cc']
 const CONTEXT_METRICS = ['heal', 'tank', 'cc']
@@ -34,6 +34,23 @@ export function upgradeState(state) {
   return state
 }
 
+/** Compteurs [parties, victoires] tenus pour chaque jungler. with / against : alliés et adversaires
+ * (hors jungler adverse, compté dans vs). */
+const CHAMP_MAPS = [
+  'runes',
+  'c1',
+  'c2',
+  'c3',
+  'boots',
+  'pet',
+  'later',
+  'skills',
+  'vs',
+  'with',
+  'against',
+  'ctxBase'
+]
+
 function inc(map, key, win, weight = 1) {
   if (key === null || key === undefined || key === '') return
   const cell = (map[key] ??= [0, 0])
@@ -43,7 +60,7 @@ function inc(map, key, win, weight = 1) {
 
 function champState(state, champ) {
   const c = (state.champs[champ] ??= { g: 0, w: 0 })
-  for (const k of ['runes', 'c1', 'c2', 'c3', 'boots', 'pet', 'later', 'skills', 'vs', 'ctxBase'])
+  for (const k of CHAMP_MAPS)
     c[k] ??= {}
   c.ctxItems ??= {}
   c.bench ??= {}
@@ -110,6 +127,8 @@ export function addRecord(state, rec) {
   inc(c.pet, rec.pet === null ? null : String(rec.pet), rec.win)
   inc(c.skills, rec.skills, rec.win)
   if (rec.enemyJungler) inc(c.vs, rec.enemyJungler, rec.win)
+  for (const ally of rec.allies ?? []) inc(c.with, ally, rec.win)
+  for (const enemy of rec.enemies ?? []) inc(c.against, enemy, rec.win)
   for (const k of BENCH_KEYS) {
     const v = rec.bench?.[k]
     if (typeof v !== 'number' || !Number.isFinite(v)) continue
@@ -152,7 +171,7 @@ export function seedFromPrevious(state, previous, factor = 0.25) {
     Object.fromEntries(Object.entries(m ?? {}).map(([k, [g, w]]) => [k, [g * factor, w * factor]]))
   for (const [champ, c] of Object.entries(previous.champs ?? {})) {
     const n = { g: c.g * factor, w: c.w * factor, ctxItems: {} }
-    for (const k of ['runes', 'c1', 'c2', 'c3', 'boots', 'pet', 'later', 'skills', 'vs', 'ctxBase'])
+    for (const k of CHAMP_MAPS)
       n[k] = scaleMap(c[k])
     for (const [ctx, m] of Object.entries(c.ctxItems ?? {})) n.ctxItems[ctx] = scaleMap(m)
     // Repères : n et somme réduits ensemble, la moyenne est conservée.
@@ -325,16 +344,30 @@ export function buildProfiles(state, minGames = 30) {
   return out
 }
 
-/** Statistiques des junglers : taux de victoire global et par jungler adverse. */
+/** [parties, taux de victoire] des entrées assez jouées d'un compteur. */
+function rates(map, minPairGames) {
+  const out = {}
+  for (const [k, [g, w]] of Object.entries(map ?? {})) {
+    if (g >= minPairGames) out[k] = [Math.round(g), round3(w / g)]
+  }
+  return out
+}
+
+/**
+ * Statistiques des junglers : taux de victoire global, par jungler adverse (vs), avec chaque
+ * champion allié (with) et contre chaque adversaire hors jungler (against).
+ */
 export function buildJunglerStats(state, minGames = 20) {
   const out = {}
   for (const [champ, c] of Object.entries(state.champs)) {
     if (c.g < minGames) continue
-    const vs = {}
-    for (const [enemy, [g, w]] of Object.entries(c.vs ?? {})) {
-      if (g >= 5) vs[enemy] = [Math.round(g), round3(w / g)]
+    out[champ] = {
+      games: Math.round(c.g),
+      winRate: round3(c.w / c.g),
+      vs: rates(c.vs, 5),
+      with: rates(c.with, 10),
+      against: rates(c.against, 10)
     }
-    out[champ] = { games: Math.round(c.g), winRate: round3(c.w / c.g), vs }
   }
   return out
 }

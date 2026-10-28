@@ -101,7 +101,9 @@ export function benchOf(info, p, timeline, events, dd) {
 
 /**
  * @returns {{ champ: string, win: boolean, runeSig: string|null, core: number[], later: number[],
- *   boots: number|null, pet: number|null, skills: string|null }[]}
+ *   boots: number|null, pet: number|null, skills: string|null, enemyJungler: string|null,
+ *   allies: string[], enemies: string[] }[]}
+ * `allies` : les 4 autres champions de l'équipe ; `enemies` : les 4 adversaires hors jungler.
  */
 export function extractJunglers(match, timeline, dd) {
   const info = match.info
@@ -132,6 +134,12 @@ export function extractJunglers(match, timeline, dd) {
     const foes = info.participants.filter((x) => x.teamId !== p.teamId)
     const sum = (f) => foes.reduce((acc, x) => acc + (Number(x[f]) || 0), 0)
     const enemyJungler = foes.find((x) => x.teamPosition === 'JUNGLE')
+    const champOf = (x) => dd.champById.get(x.championId) ?? x.championName
+    // Composition des deux équipes (synergies avec les alliés, affrontements avec les adversaires).
+    const allies = info.participants
+      .filter((x) => x.teamId === p.teamId && x.participantId !== p.participantId)
+      .map(champOf)
+    const enemies = foes.filter((x) => x !== enemyJungler).map(champOf)
 
     const myEvents = events.get(p.participantId) ?? []
     records.push({
@@ -145,9 +153,9 @@ export function extractJunglers(match, timeline, dd) {
       boots,
       pet,
       skills: skillOrder(events.get(p.participantId) ?? []),
-      enemyJungler: enemyJungler
-        ? (dd.champById.get(enemyJungler.championId) ?? enemyJungler.championName)
-        : null,
+      enemyJungler: enemyJungler ? champOf(enemyJungler) : null,
+      allies,
+      enemies,
       enemy: {
         minutes: (info.gameDuration ?? 0) / 60,
         phys: sum('physicalDamageDealtToChampions'),
