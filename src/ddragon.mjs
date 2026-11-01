@@ -8,6 +8,27 @@ async function getJson(url) {
   return res.json()
 }
 
+/** Caractéristiques d'un objet tirées de sa description (voir FOE_TRAITS dans extract.mjs). */
+export function itemTraits(desc, stats) {
+  const t = []
+  const offensive =
+    (stats.FlatPhysicalDamageMod ?? 0) > 0 ||
+    (stats.FlatMagicDamageMod ?? 0) > 0 ||
+    (stats.PercentAttackSpeedMod ?? 0) > 0
+  if (/grievous wounds/.test(desc)) t.push('antiheal')
+  if (offensive && /damage/.test(desc) && /(max(imum)?|current|missing) health/.test(desc))
+    t.push('pctHp')
+  if (/shield/.test(desc) && !/spell ?shield/.test(desc)) t.push('shield')
+  if (/stasis|spell ?shield|remove all crowd control|cleanse|untargetable/.test(desc))
+    t.push('antiCc')
+  if (/lethality|armor penetration/.test(desc)) t.push('armorPen')
+  if (/magic penetration/.test(desc)) t.push('magicPen')
+  if ((stats.FlatArmorMod ?? 0) >= 40) t.push('armor')
+  if ((stats.FlatSpellBlockMod ?? 0) >= 40) t.push('mr')
+  if ((stats.PercentLifeStealMod ?? 0) > 0 || /omnivamp|life ?steal/.test(desc)) t.push('lifesteal')
+  return t
+}
+
 /** Construit les index à partir des JSON Data Dragon (fonction pure, testable). */
 export function buildDdragon(version, championJson, itemJson, runesJson) {
   const patch = version.split('.').slice(0, 2).join('.')
@@ -17,6 +38,9 @@ export function buildDdragon(version, championJson, itemJson, runesJson) {
 
   const items = new Map()
   for (const [idStr, it] of Object.entries(itemJson.data)) {
+    const desc = String(it.description ?? '')
+      .replace(/<[^>]+>/g, ' ')
+      .toLowerCase()
     const tags = it.tags ?? []
     const into = it.into ?? []
     const total = it.gold?.total ?? 0
@@ -37,7 +61,8 @@ export function buildDdragon(version, championJson, itemJson, runesJson) {
         (into.length === 0 || intoOnlyOrnn) &&
         total >= 2000 &&
         !tags.includes('Consumable') &&
-        !tags.includes('Boots')
+        !tags.includes('Boots'),
+      traits: itemTraits(desc, it.stats ?? {})
     })
   }
 

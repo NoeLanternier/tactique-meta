@@ -5,7 +5,7 @@
 // une part minimale des parties du champion pour être retenue.
 import { ARCHETYPES, guessArchetype } from './archetypes.mjs'
 
-export const STATE_VERSION = 3
+export const STATE_VERSION = 4
 /** Contextes adverses pour lesquels on mesure la performance des objets. */
 export const CONTEXTS = ['all', 'ap', 'ad', 'heal', 'tank', 'cc']
 const CONTEXT_METRICS = ['heal', 'tank', 'cc']
@@ -22,7 +22,20 @@ export function emptyState(patch, patchStart) {
     processed: [],
     champs: {},
     profiles: {},
-    ctxStats: {}
+    ctxStats: {},
+    itemAll: {},
+    itemFoe: {},
+    foeAll: {},
+    backtest: emptyBacktest()
+  }
+}
+
+/** Compteurs du backtest : parties où le joueur a suivi (ou non) nos recommandations. */
+export function emptyBacktest() {
+  return {
+    games: 0,
+    variant: { followed: [0, 0], other: [0, 0] },
+    items: { high: [0, 0], low: [0, 0] }
   }
 }
 
@@ -30,6 +43,10 @@ export function emptyState(patch, patchStart) {
 export function upgradeState(state) {
   state.profiles ??= {}
   state.ctxStats ??= {}
+  state.itemAll ??= {}
+  state.itemFoe ??= {}
+  state.foeAll ??= {}
+  state.backtest ??= emptyBacktest()
   state.version = STATE_VERSION
   return state
 }
@@ -60,11 +77,21 @@ function inc(map, key, win, weight = 1) {
 
 function champState(state, champ) {
   const c = (state.champs[champ] ??= { g: 0, w: 0 })
-  for (const k of CHAMP_MAPS)
-    c[k] ??= {}
+  for (const k of CHAMP_MAPS) c[k] ??= {}
   c.ctxItems ??= {}
+  c.ctxSlots ??= {}
+  c.itemMin ??= {}
+  c.fam ??= {}
   c.bench ??= {}
   return c
+}
+
+/** Compteurs d'une famille de build (même premier objet légendaire). */
+const FAMILY_MAPS = ['runes', 'c2', 'c3', 'later', 'boots', 'pet', 'skills', 'ctxBase']
+function familyState(c, firstItem) {
+  const f = (c.fam[firstItem] ??= { g: 0, w: 0 })
+  for (const k of FAMILY_MAPS) f[k] ??= {}
+  return f
 }
 
 /** Repères mesurés : somme et nombre de valeurs pour chaque indicateur. */
@@ -96,8 +123,8 @@ function isHigh(state, metric, value) {
   return (value - mean) / sd > HIGH_Z
 }
 
-/** Contextes adverses d'une partie, à partir de ce qui a été réellement observé. */
-export function contextsOf(state, enemy) {
+/** Contextes adverses d'une partie, sans mettre à jour les statistiques (lecture seule). */
+export function classifyContexts(state, enemy) {
   const ctx = ['all']
   if (!enemy || !enemy.minutes) return ctx
   const dmg = enemy.phys + enemy.magic
@@ -106,11 +133,14 @@ export function contextsOf(state, enemy) {
     if (ap >= 0.55) ctx.push('ap')
     else if (ap <= 0.35) ctx.push('ad')
   }
-  for (const m of CONTEXT_METRICS) {
-    const perMin = enemy[m] / enemy.minutes
-    if (isHigh(state, m, perMin)) ctx.push(m)
-    observe(state, m, perMin)
-  }
+  for (const m of CONTEXT_METRICS) if (isHigh(state, m, enemy[m] / enemy.minutes)) ctx.push(m)
+  return ctx
+}
+
+/** Contextes adverses d'une partie, à partir de ce qui a été réellement observé. */
+export function contextsOf(state, enemy) {
+  const ctx = classifyContexts(state, enemy)
+  if (enemy?.minutes) for (const m of CONTEXT_METRICS) observe(state, m, enemy[m] / enemy.minutes)
   return ctx
 }
 
@@ -136,10 +166,46 @@ export function addRecord(state, rec) {
     cell[0] += 1
     cell[1] += v
   }
-  for (const ctx of contextsOf(state, rec.enemy)) {
+  const contexts = contextsOf(state, rec.enemy)
+  const items = rec.items ?? []
+  for (const ctx of contexts) {
     inc(c.ctxBase, ctx, rec.win)
-    const items = (c.ctxItems[ctx] ??= {})
-    for (const id of rec.items ?? []) inc(items, String(id), rec.win)
+    const present = (c.ctxItems[ctx] ??= {})
+    for (const id of items) inc(present, String(id), rec.win)
+    // Objet au k-ième rang : comparé ensuite aux autres objets achetés au même rang.
+    const slots = (c.ctxSlots[ctx] ??= {})
+    items.forEach((id, k) => inc((slots[k] ??= {}), String(id), rec.win))
+  }
+  items.forEach((id, k) => {
+    const minute = rec.itemMin?.[k]
+    if (typeof minute !== 'number') return
+    const cell = (c.itemMin[id] ??= [0, 0])
+    cell[0] += 1
+    cell[1] += minute
+  })
+
+  // Famille de build : toutes les parties qui commencent par le même objet légendaire.
+  if (rec.core.length >= 1) {
+    const f = familyState(c, String(rec.core[0]))
+    f.g++
+    if (rec.win) f.w++
+    inc(f.runes, rec.runeSig, rec.win)
+    if (rec.core.length >= 2) inc(f.c2, rec.core.slice(0, 2).join('>'), rec.win)
+    if (rec.core.length >= 3) inc(f.c3, rec.core.slice(0, 3).join('>'), rec.win)
+    for (const id of rec.later) inc(f.later, String(id), rec.win)
+    inc(f.boots, rec.boots === null ? null : String(rec.boots), rec.win)
+    inc(f.pet, rec.pet === null ? null : String(rec.pet), rec.win)
+    inc(f.skills, rec.skills, rec.win)
+    for (const ctx of contexts) inc(f.ctxBase, ctx, rec.win)
+  }
+
+  // Tous junglers confondus : chaque objet face à chaque adversaire et chaque objet adverse.
+  const foes = [...(rec.enemies ?? []), rec.enemyJungler, ...(rec.foeTags ?? [])].filter(Boolean)
+  for (const foe of foes) inc(state.foeAll, foe, rec.win)
+  for (const id of items) {
+    inc(state.itemAll, String(id), rec.win)
+    const row = (state.itemFoe[id] ??= {})
+    for (const foe of foes) inc(row, foe, rec.win)
   }
 }
 
@@ -164,23 +230,23 @@ export function addProfiles(state, profiles) {
   }
 }
 
+/** Multiplie tous les compteurs (nombres) d'une structure par `factor`. Les moyennes stockées en
+ * [nombre, somme] sont conservées. */
+function scaleDeep(x, factor) {
+  if (typeof x === 'number') return x * factor
+  if (Array.isArray(x)) return x.map((v) => scaleDeep(v, factor))
+  if (x && typeof x === 'object')
+    return Object.fromEntries(Object.entries(x).map(([k, v]) => [k, scaleDeep(v, factor)]))
+  return x
+}
+
 /** Reprend les compteurs d'un patch précédent avec un poids réduit (démarrage plus stable). */
 export function seedFromPrevious(state, previous, factor = 0.25) {
-  const scale = (x) => (typeof x === 'number' ? x * factor : x)
-  const scaleMap = (m) =>
-    Object.fromEntries(Object.entries(m ?? {}).map(([k, [g, w]]) => [k, [g * factor, w * factor]]))
-  for (const [champ, c] of Object.entries(previous.champs ?? {})) {
-    const n = { g: c.g * factor, w: c.w * factor, ctxItems: {} }
-    for (const k of CHAMP_MAPS)
-      n[k] = scaleMap(c[k])
-    for (const [ctx, m] of Object.entries(c.ctxItems ?? {})) n.ctxItems[ctx] = scaleMap(m)
-    // Repères : n et somme réduits ensemble, la moyenne est conservée.
-    n.bench = scaleMap(c.bench)
-    state.champs[champ] = n
-  }
-  for (const [champ, p] of Object.entries(previous.profiles ?? {})) {
-    state.profiles[champ] = Object.fromEntries(Object.entries(p).map(([k, v]) => [k, scale(v)]))
-  }
+  state.champs = scaleDeep(previous.champs ?? {}, factor)
+  state.profiles = scaleDeep(previous.profiles ?? {}, factor)
+  state.itemAll = scaleDeep(previous.itemAll ?? {}, factor)
+  state.itemFoe = scaleDeep(previous.itemFoe ?? {}, factor)
+  state.foeAll = scaleDeep(previous.foeAll ?? {}, factor)
   state.ctxStats = previous.ctxStats ?? {}
   state.seededFrom = previous.patch
   return state
@@ -230,8 +296,35 @@ export function runesFromSig(sig, dd) {
 }
 
 /**
+ * Effet d'un objet sur la victoire, comparé aux autres objets achetés AU MÊME RANG (1er, 2e…
+ * 6e objet légendaire). Comparer « avec / sans l'objet » avantagerait les objets tardifs : seuls
+ * les joueurs qui ont beaucoup d'or les terminent, et ceux-là gagnent plus souvent.
+ */
+function slotLift(slots, id, prior) {
+  if (!slots) return null
+  let weight = 0
+  let sum = 0
+  for (const byItem of Object.values(slots)) {
+    const cell = byItem[id]
+    if (!cell) continue
+    let g = 0
+    let w = 0
+    for (const [gg, ww] of Object.values(byItem)) {
+      g += gg
+      w += ww
+    }
+    if (g <= 0) continue
+    const slotRate = bayes(g, w, prior, 20)
+    sum += cell[0] * (bayes(cell[0], cell[1], slotRate, 20) - slotRate)
+    weight += cell[0]
+  }
+  return weight >= 10 ? { lift: sum / weight, games: weight } : null
+}
+
+/**
  * Objets qui gagnent le plus dans chaque contexte adverse : part des parties où l'objet est
- * construit, et gain de taux de victoire par rapport aux autres parties du même contexte.
+ * construit, gain de taux de victoire par rapport aux autres choix au même rang, et minute
+ * moyenne d'achat.
  */
 export function situationalStats(c, dd) {
   const out = {}
@@ -246,9 +339,19 @@ export function situationalStats(c, dd) {
         if (!it?.isLegendary || g < 5) return null
         const share = g / base[0]
         if (share < 0.04) return null
-        // Taux de victoire lissé de l'objet vs celui des parties du contexte sans cet objet.
-        const lift = bayes(g, w, prior, 20) - bayes(base[0] - g, base[1] - w, prior, 20)
-        return { item: it.name, share: round3(share), lift: round3(lift), games: Math.round(g) }
+        // Rang par rang si possible ; sinon (anciennes données) avec / sans l'objet.
+        const bySlot = slotLift(c.ctxSlots?.[ctx], id, prior)
+        const lift =
+          bySlot?.lift ?? bayes(g, w, prior, 20) - bayes(base[0] - g, base[1] - w, prior, 20)
+        const minute = c.itemMin?.[id]
+        const entry = {
+          item: it.name,
+          share: round3(share),
+          lift: round3(lift),
+          games: Math.round(g)
+        }
+        if (minute && minute[0] >= 5) entry.minute = Math.round((minute[1] / minute[0]) * 10) / 10
+        return entry
       })
       .filter(Boolean)
       .sort((a, b) => b.share - a.share)
@@ -411,6 +514,89 @@ export function buildBenchmarks(state, minGames = 30) {
 }
 
 /**
+ * Familles de build d'un champion (même premier objet légendaire) jouées dans au moins 12 % des
+ * parties : chacune avec son cœur, ses runes, ses options et son taux de victoire par contexte.
+ * Rien si une seule famille ressort.
+ */
+export function buildVariants(champ, c, dd, { minGames = 40 } = {}) {
+  const variants = []
+  const fams = Object.entries(c.fam ?? {}).sort((a, b) => b[1].g - a[1].g)
+  for (const [first, f] of fams) {
+    if (f.g < Math.max(30, minGames * 0.6) || f.g / c.g < 0.12) continue
+    const pseudo = { ...f, c1: { [first]: [f.g, f.w] }, ctxItems: {}, ctxSlots: {} }
+    const b = selectBuild(champ, pseudo, dd, { minGames: 0 })
+    if (!b) continue
+    const contexts = {}
+    for (const [ctx, [g, w]] of Object.entries(f.ctxBase ?? {}))
+      if (g >= 10) contexts[ctx] = [Math.round(g), round3(w / g)]
+    variants.push({
+      key: b.core[0],
+      archetype: b.archetype,
+      pet: b.pet,
+      boots: b.boots,
+      core: b.core,
+      options: b.options,
+      skills: b.skills,
+      runes: b.runes,
+      games: Math.round(f.g),
+      winRate: round3(f.w / f.g),
+      share: round3(f.g / c.g),
+      contexts
+    })
+    if (variants.length === 3) break
+  }
+  return variants.length >= 2 ? variants : []
+}
+
+/**
+ * Objets face aux adversaires (tous junglers confondus) : écart de taux de victoire d'un objet
+ * quand tel champion (ou tel type d'objet adverse, ex. '#pctHp') est en face, moins l'écart que ce
+ * même adversaire provoque pour tout le monde. Ne garde que les effets nets.
+ */
+export function buildItemCounters(state, dd, { minItemGames = 200, minPairGames = 40 } = {}) {
+  let G = 0
+  let W = 0
+  for (const c of Object.values(state.champs)) {
+    G += c.g
+    W += c.w
+  }
+  if (G <= 0) return {}
+  const overall = W / G
+  const out = {}
+  for (const [id, [g, w]] of Object.entries(state.itemAll ?? {})) {
+    const it = dd.items.get(Number(id))
+    if (!it?.isLegendary || g < minItemGames) continue
+    const base = w / g
+    const rows = []
+    for (const [foe, [pg, pw]] of Object.entries(state.itemFoe?.[id] ?? {})) {
+      if (pg < minPairGames) continue
+      const fa = state.foeAll?.[foe]
+      if (!fa || fa[0] < minPairGames) continue
+      const foeShift = bayes(fa[0], fa[1], overall, 50) - overall
+      const lift = bayes(pg, pw, base, 50) - base - foeShift
+      if (Math.abs(lift) >= 0.015) rows.push([foe, Math.round(pg), round3(lift)])
+    }
+    rows.sort((a, b) => Math.abs(b[2]) * Math.sqrt(b[1]) - Math.abs(a[2]) * Math.sqrt(a[1]))
+    if (rows.length)
+      out[it.name] = Object.fromEntries(rows.slice(0, 15).map(([f, pg, l]) => [f, [pg, l]]))
+  }
+  return out
+}
+
+const rateOf = ([g, w]) => (g > 0 ? round3(w / g) : null)
+
+/** Résumé du backtest pour meta.json. */
+export function backtestSummary(bt) {
+  if (!bt || bt.games === 0) return null
+  const cell = (x) => ({ games: Math.round(x[0]), winRate: rateOf(x) })
+  return {
+    games: bt.games,
+    variant: { followed: cell(bt.variant.followed), other: cell(bt.variant.other) },
+    items: { high: cell(bt.items.high), low: cell(bt.items.low) }
+  }
+}
+
+/**
  * Construit meta.json : builds du patch en cours, complétés par les builds du patch précédent pour
  * les champions qui n'ont pas encore assez de parties (ils gardent leur numéro de patch, ce qui
  * permet à l'app de prendre les runes recommandées par Riot pour eux).
@@ -419,7 +605,10 @@ export function buildMeta(state, dd, previousMeta, options = {}) {
   const builds = []
   for (const [champ, c] of Object.entries(state.champs)) {
     const b = selectBuild(champ, c, dd, options)
-    if (b) builds.push(b)
+    if (!b) continue
+    const variants = buildVariants(champ, c, dd, options)
+    if (variants.length) b.variants = variants
+    builds.push(b)
   }
   const fresh = new Set(builds.map((b) => b.id))
   const kept = (previousMeta?.builds ?? []).filter((b) => b?.id && !fresh.has(b.id) && b.patch)
@@ -436,6 +625,8 @@ export function buildMeta(state, dd, previousMeta, options = {}) {
     // Si trop peu de parties (début de patch), on garde les profils précédents.
     profiles: Object.keys(profiles).length >= 50 ? profiles : (previousMeta?.profiles ?? profiles),
     junglers: buildJunglerStats(state),
+    itemCounters: buildItemCounters(state, dd),
+    backtest: backtestSummary(state.backtest),
     // Début de patch : on garde les repères précédents tant qu'il n'y a pas assez de parties.
     benchmarks: (() => {
       const b = buildBenchmarks(state)

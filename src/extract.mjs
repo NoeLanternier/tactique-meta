@@ -30,17 +30,64 @@ function eventsByParticipant(timeline) {
   return map
 }
 
-/** Achats dans l'ordre, en tenant compte des annulations. */
+/** Achats dans l'ordre avec leur minute, en tenant compte des annulations. */
 function purchases(events) {
   const bought = []
   for (const e of events) {
-    if (e.type === 'ITEM_PURCHASED') bought.push(e.itemId)
+    if (e.type === 'ITEM_PURCHASED') bought.push({ id: e.itemId, min: (e.timestamp ?? 0) / 60000 })
     else if (e.type === 'ITEM_UNDO' && e.beforeId > 0) {
-      const idx = bought.lastIndexOf(e.beforeId)
+      let idx = -1
+      for (let i = bought.length - 1; i >= 0; i--)
+        if (bought[i].id === e.beforeId) {
+          idx = i
+          break
+        }
       if (idx >= 0) bought.splice(idx, 1)
     }
   }
   return bought
+}
+
+/**
+ * Caractéristiques d'un objet adverse qui changent la valeur de nos objets : anti-soins, dégâts en
+ * % des PV, boucliers, protections contre les contrôles et le burst (stase, bouclier anti-sort,
+ * purge), pénétration, résistances, vol de vie. Déduites de la description Data Dragon.
+ */
+export const FOE_TRAITS = [
+  'antiheal',
+  'pctHp',
+  'shield',
+  'antiCc',
+  'armorPen',
+  'magicPen',
+  'armor',
+  'mr',
+  'lifesteal'
+]
+/** Nombre d'objets adverses (fin de partie) à partir duquel la caractéristique compte. */
+export const FOE_TRAIT_MIN = {
+  antiheal: 1,
+  pctHp: 2,
+  shield: 2,
+  antiCc: 2,
+  armorPen: 2,
+  magicPen: 2,
+  armor: 3,
+  mr: 3,
+  lifesteal: 2
+}
+
+/** Caractéristiques adverses d'une partie : '#antiheal', '#pctHp'… */
+export function foeTagsOf(foes, dd) {
+  const count = {}
+  for (const f of foes) {
+    for (let i = 0; i <= 5; i++) {
+      const it = dd.items.get(Number(f[`item${i}`]))
+      if (!it?.isLegendary) continue
+      for (const t of it.traits ?? []) count[t] = (count[t] ?? 0) + 1
+    }
+  }
+  return FOE_TRAITS.filter((t) => (count[t] ?? 0) >= FOE_TRAIT_MIN[t]).map((t) => `#${t}`)
 }
 
 /** Ordre de montée des compétences : ordre dans lequel Q, W et E atteignent leur rang maximal. */
@@ -70,7 +117,8 @@ export function skillOrder(events) {
 export function benchOf(info, p, timeline, events, dd) {
   const frames = timeline?.info?.frames ?? []
   const at = (min) => frames[min]?.participantFrames?.[String(p.participantId)] ?? null
-  const cs = (f) => (f ? (Number(f.minionsKilled) || 0) + (Number(f.jungleMinionsKilled) || 0) : null)
+  const cs = (f) =>
+    f ? (Number(f.minionsKilled) || 0) + (Number(f.jungleMinionsKilled) || 0) : null
   const f10 = at(10)
   const f15 = at(15)
   const legendaryTimes = []
@@ -95,15 +143,18 @@ export function benchOf(info, p, timeline, events, dd) {
     secondItem: legendaryTimes[1] ?? null,
     kp: teamKills > 0 ? ((Number(p.kills) || 0) + (Number(p.assists) || 0)) / teamKills : null,
     visionPerMin: minutes > 0 ? (Number(p.visionScore) || 0) / minutes : null,
-    controlWardsPer10: minutes > 0 ? ((Number(p.visionWardsBoughtInGame) || 0) / minutes) * 10 : null
+    controlWardsPer10:
+      minutes > 0 ? ((Number(p.visionWardsBoughtInGame) || 0) / minutes) * 10 : null
   }
 }
 
 /**
  * @returns {{ champ: string, win: boolean, runeSig: string|null, core: number[], later: number[],
  *   boots: number|null, pet: number|null, skills: string|null, enemyJungler: string|null,
- *   allies: string[], enemies: string[] }[]}
- * `allies` : les 4 autres champions de l'équipe ; `enemies` : les 4 adversaires hors jungler.
+ *   allies: string[], enemies: string[], items: number[], itemMin: number[], foeTags: string[] }[]}
+ * `allies` : les 4 autres champions de l'équipe ; `enemies` : les 4 adversaires hors jungler ;
+ * `items` / `itemMin` : les 6 premiers objets légendaires et la minute de leur achat ;
+ * `foeTags` : caractéristiques des objets adverses (voir FOE_TRAITS).
  */
 export function extractJunglers(match, timeline, dd) {
   const info = match.info
@@ -121,11 +172,16 @@ export function extractJunglers(match, timeline, dd) {
       runeSig = `${primary.style}|${perks.join(',')}|${sub.style}|${sp.offense},${sp.flex},${sp.defense}`
     }
 
-    const bought = purchases(events.get(p.participantId) ?? [])
+    const timed = purchases(events.get(p.participantId) ?? [])
+    const bought = timed.map((b) => b.id)
     const legendaries = []
-    for (const id of bought) {
-      const it = dd.items.get(id)
-      if (it?.isLegendary && !legendaries.includes(id)) legendaries.push(id)
+    const legendaryMin = []
+    for (const b of timed) {
+      const it = dd.items.get(b.id)
+      if (it?.isLegendary && !legendaries.includes(b.id)) {
+        legendaries.push(b.id)
+        legendaryMin.push(Math.round(b.min * 10) / 10)
+      }
     }
     const boots = bought.find((id) => dd.items.get(id)?.isBoots) ?? null
     const pet = bought.find((id) => dd.items.get(id)?.isPet) ?? null
@@ -150,12 +206,15 @@ export function extractJunglers(match, timeline, dd) {
       core: legendaries.slice(0, 3),
       later: legendaries.slice(3, 6),
       items: legendaries.slice(0, 6),
+      itemMin: legendaryMin.slice(0, 6),
       boots,
       pet,
       skills: skillOrder(events.get(p.participantId) ?? []),
       enemyJungler: enemyJungler ? champOf(enemyJungler) : null,
       allies,
       enemies,
+      // Objets adverses de fin de partie qui changent la valeur des nôtres.
+      foeTags: foeTagsOf(foes, dd),
       enemy: {
         minutes: (info.gameDuration ?? 0) / 60,
         phys: sum('physicalDamageDealtToChampions'),

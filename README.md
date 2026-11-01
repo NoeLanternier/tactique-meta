@@ -20,9 +20,21 @@ grâce à l'API officielle de Riot. Le résultat, `meta.json`, est lu par l'Anal
 6. Calcule le taux de victoire de chaque jungler, de chaque affrontement de junglers, avec chaque
    champion allié et contre chaque adversaire (conseils de pick et de ban dans l'app, qui ne
    tiennent compte que des champions déjà choisis pendant la draft).
-7. Calcule les repères Master+ de chaque jungler (farm et or à 10/15 min, minute des deux
+7. Mesure l'effet de chaque objet **par rapport aux autres objets achetés au même rang** (4e, 5e…
+   objet) et sa minute moyenne d'achat : sans cela, les objets tardifs paraîtraient « gagnants »
+   simplement parce que seuls les joueurs en avance les terminent.
+8. Repère les **familles de build** de chaque champion (même premier objet, au moins 12 % des
+   parties) avec leur cœur, leurs runes et leur taux de victoire par contexte adverse : l'app
+   choisit la famille adaptée à la partie, puis suit celle qui a été commencée.
+9. Mesure, tous junglers confondus, chaque objet **face à chaque champion adverse et face aux
+   objets adverses** (anti-soins, dégâts en % des PV, boucliers, stase / anti-sorts, pénétration,
+   armure, RM, vol de vie), en retirant l'effet que cet adversaire a sur tout le monde.
+10. **Backtest** : chaque nouvelle partie est comparée à la méta de la veille avant d'être ajoutée
+    (famille recommandée suivie ou non, objets situationnels recommandés achetés ou non). Le taux
+    de victoire des deux groupes est publié dans `meta.json` (`backtest`) et dans le journal.
+11. Calcule les repères Master+ de chaque jungler (farm et or à 10/15 min, minute des deux
    premiers objets, participation, vision) utilisés par le bilan d'après-partie de l'app.
-8. Écrit `meta.json`. Les champions qui n'ont pas encore assez de parties sur le nouveau patch
+12. Écrit `meta.json`. Les champions qui n'ont pas encore assez de parties sur le nouveau patch
    gardent leur build du patch précédent (l'app prend alors les runes recommandées par Riot).
 
 Les compteurs du patch sont conservés dans `state/` : chaque exécution ajoute de nouvelles parties,

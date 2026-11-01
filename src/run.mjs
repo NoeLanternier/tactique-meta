@@ -12,10 +12,12 @@ import {
   addProfiles,
   addRecord,
   buildMeta,
+  classifyContexts,
   emptyState,
   seedFromPrevious,
   upgradeState
 } from './aggregate.mjs'
+import { evaluateRecord } from './backtest.mjs'
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(`--${name}`)
@@ -96,6 +98,8 @@ async function main() {
       log(`Nouveau patch : reprise pondérée (25 %) des données du patch ${prev.patch}`)
     }
   }
+  // Méta de la veille : sert au backtest des nouvelles parties, puis de base à la nouvelle méta.
+  const previous = existsSync(META_FILE) ? JSON.parse(readFileSync(META_FILE, 'utf-8')) : null
   const processed = new Set(state.processed)
   const deadline = Date.now() + config.minutes * 60_000
   riot.deadline = deadline + 15_000
@@ -124,7 +128,11 @@ async function main() {
         }
         const timeline = await riot.get(region, `/lol/match/v5/matches/${matchId}/timeline`)
         if (!timeline) continue
-        for (const rec of extractJunglers(match, timeline, dd)) addRecord(state, rec)
+        for (const rec of extractJunglers(match, timeline, dd)) {
+          if (previous?.patch === dd.patch)
+            evaluateRecord(previous, classifyContexts(state, rec.enemy), rec, state.backtest, dd)
+          addRecord(state, rec)
+        }
         addProfiles(state, extractProfiles(match, dd))
         counters.kept++
         if (counters.kept % 100 === 0) {
@@ -149,7 +157,6 @@ async function main() {
   // On ne garde que l'état du patch en cours.
   for (const f of readdirSync(STATE_DIR)) if (f !== `${dd.patch}.json`) rmSync(join(STATE_DIR, f))
 
-  const previous = existsSync(META_FILE) ? JSON.parse(readFileSync(META_FILE, 'utf-8')) : null
   const meta = buildMeta(state, dd, previous, { minGames: config.minGames })
   writeFileSync(META_FILE, JSON.stringify(meta, null, 2) + '\n')
 
@@ -158,6 +165,7 @@ async function main() {
       `${meta.sampleGames} junglers analysés sur le patch, ${meta.freshBuilds} builds à jour, ${meta.builds.length} au total. ` +
       `Requêtes : ${riot.stats.requests}, limites atteintes : ${riot.stats.rateLimited}.`
   )
+  if (meta.backtest) log(`Backtest : ${JSON.stringify(meta.backtest)}`)
 }
 
 main().catch((e) => {
