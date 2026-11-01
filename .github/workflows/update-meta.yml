@@ -1,4 +1,5 @@
-# Met à jour meta.json chaque jour à partir des parties classées Master+ (API officielle Riot).
+# Met à jour chaque jour meta.json (parties classées Master+) et meta-gold.json (Or à Émeraude),
+# à partir de l'API officielle de Riot.
 name: Mettre à jour la méta
 
 on:
@@ -55,6 +56,8 @@ jobs:
           RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
           MINUTES: ${{ github.event.inputs.minutes || '180' }}
           REGIONS: ${{ vars.REGIONS || 'euw1,kr,na1,sg2' }}
+          # Variable GOLD_REGIONS : régions de la méta Or à Émeraude (« none » pour la désactiver).
+          GOLD_REGIONS: ${{ vars.GOLD_REGIONS == 'none' && ' ' || vars.GOLD_REGIONS || 'euw1,na1' }}
         run: node src/run.mjs
 
       - name: Sauvegarde de l'état (branche data)
@@ -71,7 +74,7 @@ jobs:
               commit -q -m "État du $(date -u +%Y-%m-%d)"
           git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" data
 
-      - name: Publication de meta.json
+      - name: Publication des métas
         env:
           BRANCH: ${{ github.event.repository.default_branch }}
         run: |
@@ -80,6 +83,7 @@ jobs:
           # state/ n'est plus suivi sur main (il est sur la branche data).
           git rm -r -q --cached --ignore-unmatch state
           git add -A meta.json
+          if [ -f meta-gold.json ]; then git add meta-gold.json; fi
           if [ -f .gitignore ]; then git add .gitignore; fi
           if git diff --cached --quiet; then
             echo "Aucun changement."
