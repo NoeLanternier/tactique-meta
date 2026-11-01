@@ -5,7 +5,7 @@
 // Variables : RIOT_API_KEY (obligatoire), REGIONS, MINUTES, MIN_GAMES.
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { FatalError, PLATFORM_TO_REGION, RiotClient } from './riot.mjs'
+import { FatalError, PLATFORM_TO_REGION, RiotClient, keyKind } from './riot.mjs'
 import { loadDdragon } from './ddragon.mjs'
 import { extractJunglers, extractProfiles, precheck } from './extract.mjs'
 import {
@@ -104,11 +104,17 @@ async function main() {
   const deadline = Date.now() + config.minutes * 60_000
   riot.deadline = deadline + 15_000
   const counters = { matches: 0, kept: 0, skipped: {} }
+  let keyLogged = false
 
   async function collect(platform) {
     const region = PLATFORM_TO_REGION[platform]
     const players = await ladder(riot, platform)
     log(`[${platform}] ${players.length} joueurs Master+`)
+    if (riot.appLimits && !keyLogged) {
+      keyLogged = true
+      const fmt = riot.appLimits.map(([max, w]) => `${max}/${w / 1000} s`).join(', ')
+      log(`Limites de la clé (par serveur) : ${fmt} → clé ${keyKind(riot.appLimits)}`)
+    }
     for (const puuid of players) {
       if (Date.now() > deadline) break
       const ids = await riot.get(
