@@ -148,6 +148,56 @@ export function benchOf(info, p, timeline, events, dd) {
   }
 }
 
+/** Voie d'un point de la carte (coordonnées 0-15000, base bleue en bas à gauche). */
+export function laneOf(pos) {
+  if (!pos || typeof pos.x !== 'number' || typeof pos.y !== 'number') return null
+  const { x, y } = pos
+  if (Math.abs(x - y) < 2200) return 'mid'
+  if (x < 3200 || y > 11800) return 'top'
+  if (x > 11800 || y < 3200) return 'bot'
+  return 'jungle'
+}
+
+/**
+ * Combats entre les deux junglers : chaque élimination de l'un où l'autre a participé (auteur ou
+ * assistant). won : notre jungler a gagné l'échange. Minute arrondie au dixième.
+ */
+export function junglerDuels(timeline, me, foe) {
+  const out = []
+  if (!me || !foe) return out
+  for (const frame of timeline?.info?.frames ?? []) {
+    for (const e of frame.events ?? []) {
+      if (e.type !== 'CHAMPION_KILL') continue
+      const involved = (pid) => e.killerId === pid || (e.assistingParticipantIds ?? []).includes(pid)
+      const min = Math.round(((e.timestamp ?? 0) / 60000) * 10) / 10
+      if (e.victimId === foe && involved(me)) out.push({ min, won: true })
+      else if (e.victimId === me && involved(foe)) out.push({ min, won: false })
+    }
+  }
+  return out
+}
+
+/**
+ * Début de partie d'un jungler : côté de la carte où il est à 2 minutes (premier camp) et sa
+ * première participation à une élimination (minute, voie).
+ */
+export function openingOf(timeline, pid) {
+  const frames = timeline?.info?.frames ?? []
+  const pos = frames[2]?.participantFrames?.[String(pid)]?.position
+  const side = pos && typeof pos.x === 'number' ? (pos.y > pos.x ? 'top' : 'bot') : null
+  let first = null
+  for (const frame of frames) {
+    for (const e of frame.events ?? []) {
+      if (e.type !== 'CHAMPION_KILL') continue
+      if (e.killerId !== pid && !(e.assistingParticipantIds ?? []).includes(pid)) continue
+      first = { min: Math.round(((e.timestamp ?? 0) / 60000) * 10) / 10, lane: laneOf(e.position) }
+      break
+    }
+    if (first) break
+  }
+  return { side, first }
+}
+
 /**
  * @returns {{ champ: string, win: boolean, runeSig: string|null, core: number[], later: number[],
  *   boots: number|null, pet: number|null, skills: string|null, enemyJungler: string|null,
@@ -215,6 +265,9 @@ export function extractJunglers(match, timeline, dd) {
       enemies,
       // Objets adverses de fin de partie qui changent la valeur des nôtres.
       foeTags: foeTagsOf(foes, dd),
+      // Combats contre le jungler adverse et début de partie (côté, première élimination).
+      duels: junglerDuels(timeline, p.participantId, enemyJungler?.participantId),
+      opening: openingOf(timeline, p.participantId),
       enemy: {
         minutes: (info.gameDuration ?? 0) / 60,
         phys: sum('physicalDamageDealtToChampions'),

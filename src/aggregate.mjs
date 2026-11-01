@@ -83,11 +83,22 @@ function champState(state, champ) {
   c.itemMin ??= {}
   c.fam ??= {}
   c.bench ??= {}
+  c.opt ??= {}
+  for (const k of CHOICE_KINDS) c.opt[k] ??= {}
+  c.petVs ??= {}
+  c.duel ??= {}
+  c.open ??= { g: 0, top: 0, firstN: 0, firstMin: 0, lanes: {} }
   return c
 }
 
+/** Choix mesurés par contexte adverse : page de runes, bottes, familier, ordre des compétences. */
+const CHOICE_KINDS = ['runes', 'boots', 'pet', 'skills']
+/** Périodes des combats entre junglers (minutes). */
+export const DUEL_PERIODS = ['early', 'mid', 'late']
+const periodOf = (min) => (min < 6 ? 'early' : min < 14 ? 'mid' : 'late')
+
 /** Compteurs d'une famille de build (même premier objet légendaire). */
-const FAMILY_MAPS = ['runes', 'c2', 'c3', 'later', 'boots', 'pet', 'skills', 'ctxBase']
+const FAMILY_MAPS = ['runes', 'c2', 'c3', 'later', 'boots', 'pet', 'skills', 'ctxBase', 'ctxRunes']
 function familyState(c, firstItem) {
   const f = (c.fam[firstItem] ??= { g: 0, w: 0 })
   for (const k of FAMILY_MAPS) f[k] ??= {}
@@ -176,6 +187,39 @@ export function addRecord(state, rec) {
     const slots = (c.ctxSlots[ctx] ??= {})
     items.forEach((id, k) => inc((slots[k] ??= {}), String(id), rec.win))
   }
+  // Runes, bottes, familier et compétences selon le contexte adverse ; familier selon le jungler adverse.
+  const choice = {
+    runes: rec.runeSig,
+    boots: rec.boots === null ? null : String(rec.boots),
+    pet: rec.pet === null ? null : String(rec.pet),
+    skills: rec.skills
+  }
+  for (const kind of CHOICE_KINDS)
+    for (const ctx of contexts) inc((c.opt[kind][ctx] ??= {}), choice[kind], rec.win)
+  if (rec.enemyJungler) inc((c.petVs[rec.enemyJungler] ??= {}), choice.pet, rec.win)
+
+  // Combats contre le jungler adverse, par période.
+  for (const d of rec.duels ?? []) {
+    const period = periodOf(d.min)
+    for (const key of [rec.enemyJungler, '_all']) {
+      if (!key) continue
+      const cell = ((c.duel[key] ??= {})[period] ??= [0, 0])
+      cell[0] += 1
+      if (d.won) cell[1] += 1
+    }
+  }
+  // Début de partie : côté de départ et première élimination.
+  if (rec.opening?.side) {
+    c.open.g += 1
+    if (rec.opening.side === 'top') c.open.top += 1
+    const first = rec.opening.first
+    if (first && first.min < 15) {
+      c.open.firstN += 1
+      c.open.firstMin += first.min
+      if (first.lane) c.open.lanes[first.lane] = (c.open.lanes[first.lane] ?? 0) + 1
+    }
+  }
+
   items.forEach((id, k) => {
     const minute = rec.itemMin?.[k]
     if (typeof minute !== 'number') return
@@ -196,7 +240,10 @@ export function addRecord(state, rec) {
     inc(f.boots, rec.boots === null ? null : String(rec.boots), rec.win)
     inc(f.pet, rec.pet === null ? null : String(rec.pet), rec.win)
     inc(f.skills, rec.skills, rec.win)
-    for (const ctx of contexts) inc(f.ctxBase, ctx, rec.win)
+    for (const ctx of contexts) {
+      inc(f.ctxBase, ctx, rec.win)
+      inc((f.ctxRunes[ctx] ??= {}), rec.runeSig, rec.win)
+    }
   }
 
   // Tous junglers confondus : chaque objet face à chaque adversaire et chaque objet adverse.
@@ -447,6 +494,39 @@ export function buildProfiles(state, minGames = 30) {
   return out
 }
 
+/**
+ * Combats contre chaque jungler adverse (et '_all' : tous) : par période, [combats, part gagnée].
+ * Seulement les affrontements avec au moins 15 combats au total.
+ */
+export function duelStats(duel) {
+  const out = {}
+  for (const [enemy, periods] of Object.entries(duel ?? {})) {
+    const total = DUEL_PERIODS.reduce((s, p) => s + (periods[p]?.[0] ?? 0), 0)
+    if (total < 15) continue
+    const row = {}
+    for (const p of DUEL_PERIODS) {
+      const cell = periods[p]
+      if (cell && cell[0] >= 5) row[p] = [Math.round(cell[0]), round3(cell[1] / cell[0])]
+    }
+    if (Object.keys(row).length) out[enemy] = row
+  }
+  return out
+}
+
+/** Début de partie : part des départs côté haut, minute et voie de la première élimination. */
+export function openingStats(open) {
+  if (!open || open.g < 30) return null
+  const lanes = {}
+  if (open.firstN > 0)
+    for (const [lane, n] of Object.entries(open.lanes ?? {})) lanes[lane] = round3(n / open.firstN)
+  return {
+    games: Math.round(open.g),
+    top: round3(open.top / open.g),
+    firstMinute: open.firstN >= 10 ? Math.round((open.firstMin / open.firstN) * 10) / 10 : null,
+    firstLanes: lanes
+  }
+}
+
 /** [parties, taux de victoire] des entrées assez jouées d'un compteur. */
 function rates(map, minPairGames) {
   const out = {}
@@ -471,6 +551,10 @@ export function buildJunglerStats(state, minGames = 20) {
       with: rates(c.with, 10),
       against: rates(c.against, 10)
     }
+    const duels = duelStats(c.duel)
+    if (Object.keys(duels).length) out[champ].duels = duels
+    const opening = openingStats(c.open)
+    if (opening) out[champ].opening = opening
   }
   return out
 }
@@ -513,6 +597,77 @@ export function buildBenchmarks(state, minGames = 30) {
   return out
 }
 
+/** [parties, taux] par contexte d'une valeur, à partir des compteurs { ctx: { valeur: [g, w] } }. */
+function contextRates(byCtx, value) {
+  const out = {}
+  for (const [ctx, map] of Object.entries(byCtx ?? {})) {
+    const cell = map?.[value]
+    if (cell && cell[0] >= 10) out[ctx] = [Math.round(cell[0]), round3(cell[1] / cell[0])]
+  }
+  return out
+}
+
+/**
+ * Options courantes d'un choix (au moins 8 % des parties), avec leur taux de victoire par
+ * contexte adverse. `describe` transforme la valeur brute (signature de runes, identifiant
+ * d'objet…) pour l'app, ou renvoie null si elle n'est pas valide.
+ */
+function choiceList(totals, byCtx, describe, { minShare = 0.08, minGames = 20, max = 4 } = {}) {
+  const entries = Object.entries(totals ?? {})
+  const total = entries.reduce((s, [, [g]]) => s + g, 0)
+  if (total <= 0) return []
+  return entries
+    .filter(([, [g]]) => g >= minGames && g / total >= minShare)
+    .sort((a, b) => b[1][0] - a[1][0])
+    .map(([value, [g, w]]) => {
+      const desc = describe(value)
+      if (!desc) return null
+      return {
+        ...desc,
+        games: Math.round(g),
+        winRate: round3(w / g),
+        share: round3(g / total),
+        contexts: contextRates(byCtx, value)
+      }
+    })
+    .filter(Boolean)
+    .slice(0, max)
+}
+
+/**
+ * Choix d'un champion mesurés par contexte adverse : pages de runes, bottes, familier (aussi
+ * selon le jungler adverse) et ordre des compétences. Un choix n'apparaît que s'il a au moins
+ * deux options courantes.
+ */
+export function buildChoices(c, dd) {
+  const itemName = (id) => dd.items.get(Number(id))?.name ?? null
+  const out = {}
+  const runes = choiceList(c.runes, c.opt?.runes, (sig) => {
+    const r = runesFromSig(sig, dd)
+    return r ? { runes: r } : null
+  })
+  if (runes.length >= 2) out.runes = runes
+  const boots = choiceList(c.boots, c.opt?.boots, (id) => {
+    const n = itemName(id)
+    return n ? { name: n } : null
+  })
+  if (boots.length >= 2) out.boots = boots
+  const pet = choiceList(c.pet, c.opt?.pet, (id) => {
+    const n = itemName(id)
+    if (!n) return null
+    const vs = {}
+    for (const [enemy, map] of Object.entries(c.petVs ?? {})) {
+      const cell = map?.[id]
+      if (cell && cell[0] >= 10) vs[enemy] = [Math.round(cell[0]), round3(cell[1] / cell[0])]
+    }
+    return { name: n, vs }
+  })
+  if (pet.length >= 2) out.pet = pet
+  const skills = choiceList(c.skills, c.opt?.skills, (v) => (v ? { value: v } : null))
+  if (skills.length >= 2) out.skills = skills
+  return out
+}
+
 /**
  * Familles de build d'un champion (même premier objet légendaire) jouées dans au moins 12 % des
  * parties : chacune avec son cœur, ses runes, ses options et son taux de victoire par contexte.
@@ -529,7 +684,12 @@ export function buildVariants(champ, c, dd, { minGames = 40 } = {}) {
     const contexts = {}
     for (const [ctx, [g, w]] of Object.entries(f.ctxBase ?? {}))
       if (g >= 10) contexts[ctx] = [Math.round(g), round3(w / g)]
+    const runeChoices = choiceList(f.runes, f.ctxRunes, (sig) => {
+      const r = runesFromSig(sig, dd)
+      return r ? { runes: r } : null
+    })
     variants.push({
+      ...(runeChoices.length >= 2 ? { runeChoices } : {}),
       key: b.core[0],
       archetype: b.archetype,
       pet: b.pet,
@@ -608,6 +768,8 @@ export function buildMeta(state, dd, previousMeta, options = {}) {
     if (!b) continue
     const variants = buildVariants(champ, c, dd, options)
     if (variants.length) b.variants = variants
+    const choices = buildChoices(c, dd)
+    if (Object.keys(choices).length) b.choices = choices
     builds.push(b)
   }
   const fresh = new Set(builds.map((b) => b.id))
