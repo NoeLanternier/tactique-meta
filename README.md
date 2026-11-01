@@ -37,7 +37,7 @@ grâce à l'API officielle de Riot. Le résultat, `meta.json`, est lu par l'Anal
 12. Écrit `meta.json`. Les champions qui n'ont pas encore assez de parties sur le nouveau patch
    gardent leur build du patch précédent (l'app prend alors les runes recommandées par Riot).
 
-Les compteurs du patch sont conservés dans `state/` : chaque exécution ajoute de nouvelles parties,
+Les compteurs du patch sont conservés dans `state/`, sur la branche `data` du dépôt (réécrite à chaque exécution pour ne pas alourdir l'historique de `main`) : chaque exécution ajoute de nouvelles parties,
 les données s'affinent donc de jour en jour jusqu'au patch suivant. Au changement de patch, les
 données du patch précédent sont reprises avec un poids de 25 % pour des builds stables dès le
 premier jour.
