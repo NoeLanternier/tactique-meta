@@ -3,9 +3,10 @@
 // Pour éviter qu'une option jouée 3 fois avec 3 victoires passe devant tout le monde, le taux de
 // victoire est « lissé » vers celui du champion (moyenne bayésienne) et une option doit représenter
 // une part minimale des parties du champion pour être retenue.
+import { emptyTuning, solveTuning } from './tuning.mjs'
 import { ARCHETYPES, guessArchetype } from './archetypes.mjs'
 
-export const STATE_VERSION = 4
+export const STATE_VERSION = 5
 /** Contextes adverses pour lesquels on mesure la performance des objets. */
 export const CONTEXTS = ['all', 'ap', 'ad', 'heal', 'tank', 'cc']
 const CONTEXT_METRICS = ['heal', 'tank', 'cc']
@@ -26,7 +27,8 @@ export function emptyState(patch, patchStart) {
     itemAll: {},
     itemFoe: {},
     foeAll: {},
-    backtest: emptyBacktest()
+    backtest: emptyBacktest(),
+    tuning: emptyTuning()
   }
 }
 
@@ -47,6 +49,7 @@ export function upgradeState(state) {
   state.itemFoe ??= {}
   state.foeAll ??= {}
   state.backtest ??= emptyBacktest()
+  state.tuning ??= emptyTuning()
   state.version = STATE_VERSION
   return state
 }
@@ -295,6 +298,7 @@ export function seedFromPrevious(state, previous, factor = 0.25) {
   state.itemFoe = scaleDeep(previous.itemFoe ?? {}, factor)
   state.foeAll = scaleDeep(previous.foeAll ?? {}, factor)
   state.ctxStats = previous.ctxStats ?? {}
+  state.tuning = previous.tuning ? scaleDeep(previous.tuning, factor) : emptyTuning()
   state.seededFrom = previous.patch
   return state
 }
@@ -789,6 +793,8 @@ export function buildMeta(state, dd, previousMeta, options = {}) {
     junglers: buildJunglerStats(state),
     itemCounters: buildItemCounters(state, dd),
     backtest: backtestSummary(state.backtest),
+    // Réglage automatique des poids du moteur de l'app (voir tuning.mjs).
+    tuning: solveTuning(state.tuning) ?? previousMeta?.tuning ?? null,
     // Début de patch : on garde les repères précédents tant qu'il n'y a pas assez de parties.
     benchmarks: (() => {
       const b = buildBenchmarks(state)

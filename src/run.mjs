@@ -18,6 +18,7 @@ import {
   upgradeState
 } from './aggregate.mjs'
 import { evaluateRecord } from './backtest.mjs'
+import { addTuning, tuningFeatures } from './tuning.mjs'
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(`--${name}`)
@@ -135,8 +136,11 @@ async function main() {
         const timeline = await riot.get(region, `/lol/match/v5/matches/${matchId}/timeline`)
         if (!timeline) continue
         for (const rec of extractJunglers(match, timeline, dd)) {
-          if (previous?.patch === dd.patch)
-            evaluateRecord(previous, classifyContexts(state, rec.enemy), rec, state.backtest, dd)
+          if (previous?.patch === dd.patch) {
+            const contexts = classifyContexts(state, rec.enemy)
+            evaluateRecord(previous, contexts, rec, state.backtest, dd)
+            addTuning(state.tuning, tuningFeatures(previous, rec, contexts, dd), rec.win)
+          }
           addRecord(state, rec)
         }
         addProfiles(state, extractProfiles(match, dd))
@@ -172,6 +176,8 @@ async function main() {
       `Requêtes : ${riot.stats.requests}, limites atteintes : ${riot.stats.rateLimited}.`
   )
   if (meta.backtest) log(`Backtest : ${JSON.stringify(meta.backtest)}`)
+  if (meta.tuning) log(`Réglage du moteur : ${JSON.stringify(meta.tuning)}`)
+  else log(`Réglage du moteur : ${Math.round(state.tuning.n)} parties (il en faut 2000)`)
 }
 
 main().catch((e) => {
