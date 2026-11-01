@@ -32,6 +32,20 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
 
+      # Les compteurs du patch (dossier state/) vivent sur la branche « data », réécrite à chaque
+      # exécution : ils ne s'accumulent pas jour après jour dans l'historique de main.
+      # Tant que cette branche n'existe pas, on reprend le dossier state/ de main.
+      - name: Reprise de l'état
+        run: |
+          if git fetch -q --depth=1 origin data; then
+            rm -rf state
+            git checkout FETCH_HEAD -- state
+            git reset -q -- state
+            echo "État repris de la branche data."
+          else
+            echo "Pas encore de branche data : état de main."
+          fi
+
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -43,13 +57,29 @@ jobs:
           REGIONS: ${{ vars.REGIONS || 'euw1,kr,na1,sg2' }}
         run: node src/run.mjs
 
+      - name: Sauvegarde de l'état (branche data)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tmp="$(mktemp -d)"
+          cp -r state "$tmp/"
+          cd "$tmp"
+          git init -q -b data
+          git add -A
+          git -c user.name="tactique-meta-bot" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "État du $(date -u +%Y-%m-%d)"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" data
+
       - name: Publication de meta.json
         env:
           BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           git config user.name "tactique-meta-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A meta.json state
+          # state/ n'est plus suivi sur main (il est sur la branche data).
+          git rm -r -q --cached --ignore-unmatch state
+          git add -A meta.json .gitignore
           if git diff --cached --quiet; then
             echo "Aucun changement."
             exit 0
