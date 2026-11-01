@@ -61,7 +61,9 @@ Options : `--minutes 90`, `--regions euw1,kr,na1`, `--min-games 40`, `--out doss
 
 ## Limites
 
-- Clé personnelle : 100 requêtes / 2 minutes par région, soit environ 1 500 parties par heure et par
-  région. Usage personnel uniquement (pas d'application publique).
+- Les limites de requêtes sont lues dans les réponses de Riot et le journal indique le type de clé
+  (« Limites de la clé … → clé production »). Clé personnelle : 100 requêtes / 2 minutes par région,
+  soit environ 1 500 parties par heure et par région. Clé de production : en général 500 requêtes /
+  10 secondes, la collecte va alors bien plus vite.
 - GitHub peut désactiver une tâche planifiée d'un dépôt public après 60 jours sans activité. Si vous
   recevez l'e-mail d'avertissement, ouvrez l'onglet Actions et cliquez sur « Enable workflow ».
