@@ -40,7 +40,13 @@ grâce à l'API officielle de Riot. Le résultat, `meta.json`, est lu par l'Anal
     la carte à 2 minutes, minute et voie de sa première élimination). Affiché avant la partie.
 13. Calcule les repères Master+ de chaque jungler (farm et or à 10/15 min, minute des deux
    premiers objets, participation, vision) utilisés par le bilan d'après-partie de l'app.
-14. Écrit `meta.json`. Les champions qui n'ont pas encore assez de parties sur le nouveau patch
+14. **Réglage automatique du moteur** : sur les mêmes nouvelles parties (évaluées avec la méta de
+    la veille), mesure combien chaque critère du moteur de l'app prédit réellement la victoire
+    (force du champion, jungler adverse, alliés et adversaires, famille de build, runes / bottes /
+    familier / compétences, objets face aux adversaires). Chaque critère reçoit un coefficient
+    (1 = poids actuel, borné entre 0 et 2, rapproché de 1 s'il est mal mesuré), publié dans
+    `meta.json` (`tuning`) dès 2 000 parties : l'app multiplie chaque critère par son coefficient.
+15. Écrit `meta.json`. Les champions qui n'ont pas encore assez de parties sur le nouveau patch
    gardent leur build du patch précédent (l'app prend alors les runes recommandées par Riot).
 
 Les compteurs du patch sont conservés dans `state/`, sur la branche `data` du dépôt (réécrite à chaque exécution pour ne pas alourdir l'historique de `main`) : chaque exécution ajoute de nouvelles parties,
