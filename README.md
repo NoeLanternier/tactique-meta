@@ -32,9 +32,15 @@ grâce à l'API officielle de Riot. Le résultat, `meta.json`, est lu par l'Anal
 10. **Backtest** : chaque nouvelle partie est comparée à la méta de la veille avant d'être ajoutée
     (famille recommandée suivie ou non, objets situationnels recommandés achetés ou non). Le taux
     de victoire des deux groupes est publié dans `meta.json` (`backtest`) et dans le journal.
-11. Calcule les repères Master+ de chaque jungler (farm et or à 10/15 min, minute des deux
+11. Mesure par contexte adverse les **options courantes** de chaque champion (pages de runes, aussi
+    par famille de build ; bottes ; familier, aussi selon le jungler adverse ; ordre des
+    compétences) : l'app garde le choix du build sauf si une autre option gagne nettement plus.
+12. Mesure les **combats entre les deux junglers** (éliminations où l'autre a participé) par
+    période (avant 6 min, 6 à 14 min, après), et le **début de partie** de chaque jungler (côté de
+    la carte à 2 minutes, minute et voie de sa première élimination). Affiché avant la partie.
+13. Calcule les repères Master+ de chaque jungler (farm et or à 10/15 min, minute des deux
    premiers objets, participation, vision) utilisés par le bilan d'après-partie de l'app.
-12. Écrit `meta.json`. Les champions qui n'ont pas encore assez de parties sur le nouveau patch
+14. Écrit `meta.json`. Les champions qui n'ont pas encore assez de parties sur le nouveau patch
    gardent leur build du patch précédent (l'app prend alors les runes recommandées par Riot).
 
 Les compteurs du patch sont conservés dans `state/`, sur la branche `data` du dépôt (réécrite à chaque exécution pour ne pas alourdir l'historique de `main`) : chaque exécution ajoute de nouvelles parties,
