@@ -5,6 +5,12 @@ compétences) à partir des parties classées **Master, Grandmaster et Challenge
 grâce à l'API officielle de Riot. Le résultat, `meta.json`, est lu par l'Analyseur Tactique
 (Réglages → Mise à jour de la méta).
 
+Une seconde méta, `meta-gold.json`, est calculée de la même façon à partir des parties **Or,
+Platine et Émeraude** (par défaut sur `euw1` et `na1`, variable `GOLD_REGIONS`, `none` pour la
+désactiver). L'app la prend pour les joueurs de ces rangs et garde la méta Master+ pour les
+champions qui n'y ont pas encore assez de parties. Les deux collectes tournent en même temps et se
+partagent les limites de la clé : sur `euw1` et `na1`, chacune a environ la moitié des requêtes.
+
 ## Fonctionnement
 
 1. Récupère les joueurs Master+ de chaque région (`euw1`, `kr`, `na1`, `sg2` par défaut : une
@@ -46,10 +52,13 @@ grâce à l'API officielle de Riot. Le résultat, `meta.json`, est lu par l'Anal
     familier / compétences, objets face aux adversaires). Chaque critère reçoit un coefficient
     (1 = poids actuel, borné entre 0 et 2, rapproché de 1 s'il est mal mesuré), publié dans
     `meta.json` (`tuning`) dès 2 000 parties : l'app multiplie chaque critère par son coefficient.
-15. Écrit `meta.json`. Les champions qui n'ont pas encore assez de parties sur le nouveau patch
+15. **Contrôle des données** : si les runes, les objets, les compétences ou les positions ne sont
+    plus trouvés pour la plupart des junglers (format des réponses de Riot changé), la collecte
+    échoue sans rien publier. GitHub envoie alors un e-mail d'échec du workflow.
+16. Écrit `meta.json` (et `meta-gold.json`). Les champions qui n'ont pas encore assez de parties sur le nouveau patch
    gardent leur build du patch précédent (l'app prend alors les runes recommandées par Riot).
 
-Les compteurs du patch sont conservés dans `state/`, sur la branche `data` du dépôt (réécrite à chaque exécution pour ne pas alourdir l'historique de `main`) : chaque exécution ajoute de nouvelles parties,
+Les compteurs du patch sont conservés dans `state/` (`state/gold/` pour la méta Or à Émeraude), sur la branche `data` du dépôt (réécrite à chaque exécution pour ne pas alourdir l'historique de `main`) : chaque exécution ajoute de nouvelles parties,
 les données s'affinent donc de jour en jour jusqu'au patch suivant. Au changement de patch, les
 données du patch précédent sont reprises avec un poids de 25 % pour des builds stables dès le
 premier jour.
@@ -63,7 +72,7 @@ npm start                         # collecte complète (90 min par défaut, 180 
 npm test                          # tests sur données simulées
 ```
 
-Options : `--minutes 90`, `--regions euw1,kr,na1`, `--min-games 40`, `--out dossier`.
+Options : `--minutes 90`, `--regions euw1,kr,na1`, `--gold-regions euw1` (vide : pas de méta Or), `--min-games 40`, `--out dossier`.
 
 ## Limites
 
