@@ -24,6 +24,9 @@ test('collecte complète : Master+ et Or à Émeraude, puis réglage le lendemai
   assert.equal(gold.bracket, 'gold')
   assert.ok(master.builds.some((b) => b.id === 'LeeSin'))
   assert.ok(gold.sampleGames > 0)
+  // Taux de victoire selon la composition adverse, et taux de bannissement.
+  assert.equal(master.junglers.Viego.banRate, 1)
+  assert.equal(master.junglers.LeeSin.banRate, 0)
   assert.ok(existsSync(join(out, 'state', '16.21.json')))
   assert.ok(existsSync(join(out, 'state', 'gold', '16.21.json')))
 

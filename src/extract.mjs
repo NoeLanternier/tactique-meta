@@ -285,6 +285,17 @@ export function extractJunglers(match, timeline, dd) {
  * Profil mesuré de chacun des 10 joueurs d'une partie (tous postes) : sert à connaître le vrai
  * profil de chaque champion (part de dégâts magiques, résistance, contrôles, soins, boucliers…).
  */
+/** Champions bannis d'une partie (les deux équipes). */
+export function bansOf(match, dd) {
+  const out = []
+  for (const team of match.info?.teams ?? [])
+    for (const b of team.bans ?? []) {
+      const champ = b?.championId > 0 ? dd.champById.get(b.championId) : null
+      if (champ) out.push(champ)
+    }
+  return out
+}
+
 export function extractProfiles(match, dd) {
   const info = match.info
   const minutes = (info.gameDuration ?? 0) / 60

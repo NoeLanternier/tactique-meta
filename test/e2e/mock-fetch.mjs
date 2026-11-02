@@ -92,7 +92,7 @@ function match(id) {
     }]))
   }))
   return [
-    { metadata: { matchId: id }, info: { queueId: 420, gameVersion: '16.21.712.1', gameDuration: 1800, participants } },
+    { metadata: { matchId: id }, info: { queueId: 420, gameVersion: '16.21.712.1', gameDuration: 1800, participants, teams: [{ teamId: 100, bans: [{ championId: 234, pickTurn: 1 }] }, { teamId: 200, bans: [{ championId: -1, pickTurn: 6 }] }] } },
     { info: { frames } }
   ]
 }

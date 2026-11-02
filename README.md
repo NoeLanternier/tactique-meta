@@ -24,8 +24,9 @@ partagent les limites de la clé : sur `euw1` et `na1`, chacune a environ la moi
    résistance, contrôles, soins, boucliers), et la performance des objets selon le contexte adverse
    (équipe très AP, très AD, beaucoup de soins, très résistante, beaucoup de contrôles).
 6. Calcule le taux de victoire de chaque jungler, de chaque affrontement de junglers, avec chaque
-   champion allié et contre chaque adversaire (conseils de pick et de ban dans l'app, qui ne
-   tiennent compte que des champions déjà choisis pendant la draft).
+   champion allié et contre chaque adversaire, selon la composition adverse (équipe très AP, très
+   AD, soins, résistante, contrôles), et son taux de bannissement (conseils de pick et de ban dans
+   l'app, qui ne tiennent compte que des champions déjà choisis pendant la draft).
 7. Mesure l'effet de chaque objet **par rapport aux autres objets achetés au même rang** (4e, 5e…
    objet) et sa minute moyenne d'achat : sans cela, les objets tardifs paraîtraient « gagnants »
    simplement parce que seuls les joueurs en avance les terminent.

@@ -28,7 +28,8 @@ export function emptyState(patch, patchStart) {
     itemFoe: {},
     foeAll: {},
     backtest: emptyBacktest(),
-    tuning: emptyTuning()
+    tuning: emptyTuning(),
+    bans: { games: 0, champs: {} }
   }
 }
 
@@ -50,6 +51,7 @@ export function upgradeState(state) {
   state.foeAll ??= {}
   state.backtest ??= emptyBacktest()
   state.tuning ??= emptyTuning()
+  state.bans ??= { games: 0, champs: {} }
   state.version = STATE_VERSION
   return state
 }
@@ -259,6 +261,13 @@ export function addRecord(state, rec) {
   }
 }
 
+/** Bannissements : nombre de parties, et de parties où chaque champion a été banni. */
+export function addBans(state, champs) {
+  const b = (state.bans ??= { games: 0, champs: {} })
+  b.games++
+  for (const c of new Set(champs)) b.champs[c] = (b.champs[c] ?? 0) + 1
+}
+
 export function addProfiles(state, profiles) {
   for (const p of profiles) {
     if (!p.champ || !p.minutes) continue
@@ -298,6 +307,7 @@ export function seedFromPrevious(state, previous, factor = 0.25) {
   state.itemFoe = scaleDeep(previous.itemFoe ?? {}, factor)
   state.foeAll = scaleDeep(previous.foeAll ?? {}, factor)
   state.ctxStats = previous.ctxStats ?? {}
+  state.bans = previous.bans ? scaleDeep(previous.bans, factor) : { games: 0, champs: {} }
   state.tuning = previous.tuning ? scaleDeep(previous.tuning, factor) : emptyTuning()
   state.seededFrom = previous.patch
   return state
@@ -555,6 +565,13 @@ export function buildJunglerStats(state, minGames = 20) {
       with: rates(c.with, 10),
       against: rates(c.against, 10)
     }
+    // Taux de victoire selon la composition adverse (équipe très AP, très AD, soins…).
+    const contexts = {}
+    for (const [ctx, [g, w]] of Object.entries(c.ctxBase ?? {}))
+      if (ctx !== 'all' && g >= 30) contexts[ctx] = [Math.round(g), round3(w / g)]
+    if (Object.keys(contexts).length) out[champ].contexts = contexts
+    const bans = state.bans
+    if (bans?.games >= 100) out[champ].banRate = round3((bans.champs[champ] ?? 0) / bans.games)
     const duels = duelStats(c.duel)
     if (Object.keys(duels).length) out[champ].duels = duels
     const opening = openingStats(c.open)

@@ -13,8 +13,9 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { join } from 'node:path'
 import { FatalError, PLATFORM_TO_REGION, RiotClient, keyKind } from './riot.mjs'
 import { loadDdragon } from './ddragon.mjs'
-import { extractJunglers, extractProfiles, precheck } from './extract.mjs'
+import { bansOf, extractJunglers, extractProfiles, precheck } from './extract.mjs'
 import {
+  addBans,
   addProfiles,
   addRecord,
   buildMeta,
@@ -211,6 +212,7 @@ async function main() {
           addRecord(state, rec)
         }
         addProfiles(state, extractProfiles(match, dd))
+        addBans(state, bansOf(match, dd))
         counters.kept++
         if (counters.kept % 100 === 0) {
           log(`[${bracket.label}] ${counters.kept} parties analysées (${riot.stats.requests} requêtes)`)
