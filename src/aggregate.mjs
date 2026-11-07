@@ -65,6 +65,7 @@ const CHAMP_MAPS = [
   'c3',
   'boots',
   'pet',
+  'start',
   'later',
   'skills',
   'vs',
@@ -171,6 +172,7 @@ export function addRecord(state, rec) {
   for (const id of rec.later) inc(c.later, String(id), rec.win)
   inc(c.boots, rec.boots === null ? null : String(rec.boots), rec.win)
   inc(c.pet, rec.pet === null ? null : String(rec.pet), rec.win)
+  inc(c.start, rec.start ?? null, rec.win)
   inc(c.skills, rec.skills, rec.win)
   if (rec.enemyJungler) inc(c.vs, rec.enemyJungler, rec.win)
   for (const ally of rec.allies ?? []) inc(c.with, ally, rec.win)
@@ -455,6 +457,11 @@ export function selectBuild(champ, c, dd, { minGames = 40 } = {}) {
   const boots = pickBest(c.boots, prior)
   const pet = pickBest(c.pet, prior, { minShare: 0.15 })
   const skills = pickBest(c.skills, prior, { minShare: 0.15 }) ?? ''
+  // Départ le plus courant parmi les bons (le choix du départ dépend surtout de l'habitude).
+  const startSig = pickBest(c.start ?? {}, prior, { minShare: 0.2 })
+  const start = startSig
+    ? startSig.split(',').map((id) => itemName(id)).filter(Boolean)
+    : []
   const coreItems = core.map((id) => dd.items.get(Number(id)))
 
   return {
@@ -465,6 +472,7 @@ export function selectBuild(champ, c, dd, { minGames = 40 } = {}) {
     core: coreItems.map((it) => it.name),
     options,
     skills,
+    ...(start.length ? { start } : {}),
     runes,
     situational: situationalStats(c, dd),
     patch: dd.patch,

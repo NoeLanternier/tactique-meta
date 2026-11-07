@@ -2,6 +2,8 @@
 import { patchOf } from './ddragon.mjs'
 
 export const RANKED_SOLO = 420
+/** Balises (données gratuitement, pas un choix de départ). */
+const TRINKETS = new Set([3340, 3363, 3364, 3330])
 const MIN_DURATION = 15 * 60 // en dessous : remake / abandon précoce, peu représentatif
 const SKILLS = ['', 'Q', 'W', 'E', 'R']
 
@@ -258,6 +260,11 @@ export function extractPlayers(match, timeline, dd, roles = ROLES) {
     }
     const boots = bought.find((id) => dd.items.get(id)?.isBoots) ?? null
     const pet = jungle ? (bought.find((id) => dd.items.get(id)?.isPet) ?? null) : null
+    // Objets de départ : achats de la première minute et demie (familier, anneau de Doran…).
+    const start = timed
+      .filter((b) => b.min < 1.5 && !TRINKETS.has(b.id))
+      .map((b) => b.id)
+      .sort((a, b) => a - b)
 
     // Contexte adverse réellement observé dans cette partie (dégâts, soins, résistance, contrôles).
     const foes = info.participants.filter((x) => x.teamId !== p.teamId)
@@ -283,6 +290,7 @@ export function extractPlayers(match, timeline, dd, roles = ROLES) {
       itemMin: legendaryMin.slice(0, 6),
       boots,
       pet,
+      start: start.length ? start.join(',') : null,
       skills: skillOrder(events.get(p.participantId) ?? []),
       enemyJungler: enemyJungler ? champOf(enemyJungler) : null,
       allies,
