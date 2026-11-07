@@ -13,7 +13,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { join } from 'node:path'
 import { FatalError, PLATFORM_TO_REGION, RiotClient, keyKind } from './riot.mjs'
 import { loadDdragon } from './ddragon.mjs'
-import { bansOf, extractJunglers, extractProfiles, precheck } from './extract.mjs'
+import { ROLES, bansOf, extractPlayers, extractProfiles, precheck } from './extract.mjs'
 import {
   addBans,
   addProfiles,
@@ -46,6 +46,8 @@ const config = {
   regions: list(arg('regions', process.env.REGIONS || 'euw1,kr,na1,sg2')),
   goldRegions: list(arg('gold-regions', process.env.GOLD_REGIONS ?? 'euw1,na1')),
   minGames: Number(arg('min-games', process.env.MIN_GAMES || '40')),
+  // Postes : une méta par poste (meta.json pour la jungle, meta-top.json, meta-mid.json…).
+  roles: list(arg('roles', process.env.ROLES || ROLES.join(','))).filter((r) => ROLES.includes(r)),
   matchesPerPlayer: 20
 }
 
@@ -115,11 +117,23 @@ async function ladder(riot, platform, bracket) {
   return shuffle([...new Set(puuids)])
 }
 
-/** Charge (ou crée) l'état du patch d'un niveau. */
-function loadState(bracket, dd, states) {
-  mkdirSync(bracket.stateDir, { recursive: true })
-  const statePath = join(bracket.stateDir, `${dd.patch}.json`)
-  const jsonFiles = () => readdirSync(bracket.stateDir).filter((f) => f.endsWith('.json'))
+/** Fichiers d'un poste dans un niveau : la jungle garde les noms historiques (meta.json…). */
+function slotOf(bracket, role) {
+  const jungle = role === 'jungle'
+  const metaBase = bracket.metaFile.replace(/\.json$/, '')
+  return {
+    role,
+    label: jungle ? bracket.label : `${bracket.label} · ${role}`,
+    stateDir: jungle ? bracket.stateDir : join(bracket.stateDir, role),
+    metaFile: jungle ? bracket.metaFile : `${metaBase}-${role}.json`
+  }
+}
+
+/** Charge (ou crée) l'état du patch d'un poste dans un niveau. */
+function loadState(slot, dd, seed) {
+  mkdirSync(slot.stateDir, { recursive: true })
+  const statePath = join(slot.stateDir, `${dd.patch}.json`)
+  const jsonFiles = () => readdirSync(slot.stateDir).filter((f) => f.endsWith('.json'))
   const previousFiles = jsonFiles().filter((f) => f !== `${dd.patch}.json`)
   if (existsSync(statePath)) return upgradeState(JSON.parse(readFileSync(statePath, 'utf-8')))
   // Début estimé du patch : 36 h avant l'exécution qui le découvre (4 jours au tout premier
@@ -131,14 +145,13 @@ function loadState(bracket, dd, states) {
   // Nouveau patch : on repart des données du patch précédent avec un poids de 25 %, pour avoir
   // des builds stables dès le premier jour ; les nouvelles parties prennent vite le dessus.
   if (previousFiles.length > 0) {
-    const prev = upgradeState(JSON.parse(readFileSync(join(bracket.stateDir, previousFiles[0]), 'utf-8')))
+    const prev = upgradeState(JSON.parse(readFileSync(join(slot.stateDir, previousFiles[0]), 'utf-8')))
     seedFromPrevious(state, prev, 0.25)
-    log(`[${bracket.label}] nouveau patch : reprise pondérée (25 %) du patch ${prev.patch}`)
-  } else if (bracket.seedFrom && states.get(bracket.seedFrom)) {
-    const from = states.get(bracket.seedFrom)
-    seedFromPrevious(state, from, bracket.seedFactor)
-    state.seededFrom = `${from.patch} ${bracket.seedFrom}`
-    log(`[${bracket.label}] premier lancement : reprise (${bracket.seedFactor * 100} %) des données ${bracket.seedFrom}`)
+    log(`[${slot.label}] nouveau patch : reprise pondérée (25 %) du patch ${prev.patch}`)
+  } else if (seed?.state) {
+    seedFromPrevious(state, seed.state, seed.factor)
+    state.seededFrom = `${seed.state.patch} ${seed.from}`
+    log(`[${slot.label}] premier lancement : reprise (${seed.factor * 100} %) des données ${seed.from}`)
   }
   return state
 }
@@ -147,34 +160,50 @@ async function main() {
   for (const r of new Set(BRACKETS.flatMap((b) => b.regions))) {
     if (!PLATFORM_TO_REGION[r]) throw new FatalError(`Région inconnue : "${r}" (ex. euw1, kr, na1)`)
   }
+  if (!config.roles.length) throw new FatalError(`Aucun poste valide (ex. ${ROLES.join(',')})`)
   const riot = new RiotClient(config.apiKey)
   const dd = await loadDdragon()
   log(
-    `Patch ${dd.patch} (Data Dragon ${dd.version}) — ${config.minutes} min — ` +
+    `Patch ${dd.patch} (Data Dragon ${dd.version}) — ${config.minutes} min — postes ${config.roles.join(', ')} — ` +
       BRACKETS.map((b) => `${b.label} : ${b.regions.join(', ')}`).join(' ; ')
   )
 
   const deadline = Date.now() + config.minutes * 60_000
   riot.deadline = deadline + 15_000
   let keyLogged = false
+  // Poste principal : garde la liste des parties déjà lues et les profils des champions.
+  const mainRole = config.roles.includes('jungle') ? 'jungle' : config.roles[0]
   const states = new Map()
   const runs = []
   for (const bracket of BRACKETS) {
-    const state = loadState(bracket, dd, states)
-    states.set(bracket.key, state)
+    const roles = new Map()
+    for (const role of config.roles) {
+      const slot = slotOf(bracket, role)
+      const from = bracket.seedFrom ? states.get(`${bracket.seedFrom}:${role}`) : null
+      const seed = from ? { state: from, from: `${bracket.seedFrom}`, factor: bracket.seedFactor } : null
+      const state = loadState(slot, dd, seed)
+      states.set(`${bracket.key}:${role}`, state)
+      roles.set(role, {
+        ...slot,
+        state,
+        // Méta de la veille : sert au backtest et au réglage, puis de base à la nouvelle méta.
+        previous: existsSync(slot.metaFile) ? JSON.parse(readFileSync(slot.metaFile, 'utf-8')) : null,
+        records: 0
+      })
+    }
+    const main = roles.get(mainRole).state
     runs.push({
       bracket,
-      state,
-      // Méta de la veille : sert au backtest et au réglage, puis de base à la nouvelle méta.
-      previous: existsSync(bracket.metaFile) ? JSON.parse(readFileSync(bracket.metaFile, 'utf-8')) : null,
-      processed: new Set(state.processed),
+      roles,
+      main,
+      processed: new Set(main.processed),
       counters: { matches: 0, kept: 0, skipped: {} },
       quality: emptyQuality()
     })
   }
 
   async function collect(run, platform) {
-    const { bracket, state, previous, processed, counters, quality } = run
+    const { bracket, roles, main, processed, counters, quality } = run
     const region = PLATFORM_TO_REGION[platform]
     const players = await ladder(riot, platform, bracket)
     log(`[${bracket.label}] [${platform}] ${players.length} joueurs`)
@@ -187,7 +216,7 @@ async function main() {
       if (Date.now() > deadline) break
       const ids = await riot.get(
         region,
-        `/lol/match/v5/matches/by-puuid/${puuid}/ids?queue=420&type=ranked&startTime=${state.patchStart}&count=${config.matchesPerPlayer}`
+        `/lol/match/v5/matches/by-puuid/${puuid}/ids?queue=420&type=ranked&startTime=${main.patchStart}&count=${config.matchesPerPlayer}`
       )
       for (const matchId of ids ?? []) {
         if (Date.now() > deadline) break
@@ -202,17 +231,23 @@ async function main() {
         }
         const timeline = await riot.get(region, `/lol/match/v5/matches/${matchId}/timeline`)
         if (!timeline) continue
-        for (const rec of extractJunglers(match, timeline, dd)) {
-          recordQuality(quality, rec)
-          if (previous?.patch === dd.patch) {
-            const contexts = classifyContexts(state, rec.enemy)
-            evaluateRecord(previous, contexts, rec, state.backtest, dd)
-            addTuning(state.tuning, tuningFeatures(previous, rec, contexts, dd), rec.win)
+        for (const rec of extractPlayers(match, timeline, dd, config.roles)) {
+          const slot = roles.get(rec.role)
+          if (!slot) continue
+          // Contrôle des données : les supports achètent leur premier objet plus tard, on ne
+          // les compte pas (les seuils sont faits pour les autres postes).
+          if (rec.role !== 'support') recordQuality(quality, rec)
+          if (slot.previous?.patch === dd.patch) {
+            const contexts = classifyContexts(slot.state, rec.enemy)
+            evaluateRecord(slot.previous, contexts, rec, slot.state.backtest, dd)
+            addTuning(slot.state.tuning, tuningFeatures(slot.previous, rec, contexts, dd), rec.win)
           }
-          addRecord(state, rec)
+          addRecord(slot.state, rec)
+          slot.records++
         }
-        addProfiles(state, extractProfiles(match, dd))
-        addBans(state, bansOf(match, dd))
+        addProfiles(main, extractProfiles(match, dd))
+        const bans = bansOf(match, dd)
+        for (const slot of roles.values()) addBans(slot.state, bans)
         counters.kept++
         if (counters.kept % 100 === 0) {
           log(`[${bracket.label}] ${counters.kept} parties analysées (${riot.stats.requests} requêtes)`)
@@ -244,27 +279,41 @@ async function main() {
     )
   }
 
-  for (const { bracket, state, previous, processed, counters, quality } of runs) {
-    state.processed = [...processed]
-    state.updatedAt = new Date().toISOString()
-    writeFileSync(join(bracket.stateDir, `${dd.patch}.json`), JSON.stringify(state))
-    // On ne garde que l'état du patch en cours.
-    for (const f of readdirSync(bracket.stateDir))
-      if (f.endsWith('.json') && f !== `${dd.patch}.json`) rmSync(join(bracket.stateDir, f))
-
-    const meta = buildMeta(state, dd, previous, { minGames: config.minGames })
-    meta.bracket = bracket.key
-    writeFileSync(bracket.metaFile, JSON.stringify(meta, null, 2) + '\n')
-
-    const L = `[${bracket.label}]`
+  for (const { bracket, roles, main, processed, counters, quality } of runs) {
+    main.processed = [...processed]
     log(
-      `${L} terminé : ${counters.kept} nouvelles parties (${counters.matches} lues, ignorées : ${JSON.stringify(counters.skipped)}), ` +
-        `${meta.sampleGames} junglers analysés sur le patch, ${meta.freshBuilds} builds à jour, ${meta.builds.length} au total.`
+      `[${bracket.label}] terminé : ${counters.kept} nouvelles parties (${counters.matches} lues, ignorées : ${JSON.stringify(counters.skipped)})`
     )
-    log(`${L} contrôle des données : ${JSON.stringify(quality)}`)
-    if (meta.backtest) log(`${L} backtest : ${JSON.stringify(meta.backtest)}`)
-    if (meta.tuning) log(`${L} réglage du moteur : ${JSON.stringify(meta.tuning)}`)
-    else log(`${L} réglage du moteur : ${Math.round(state.tuning.n)} parties (il en faut 2000)`)
+    log(`[${bracket.label}] contrôle des données : ${JSON.stringify(quality)}`)
+    // Poste principal d'abord : ses profils de champions servent aux métas des autres postes.
+    const ordered = [...roles.values()].sort((a, b) => (a.role === mainRole ? -1 : b.role === mainRole ? 1 : 0))
+    let profiles = null
+    for (const slot of ordered) {
+      const { state, previous } = slot
+      state.updatedAt = new Date().toISOString()
+      const json = JSON.stringify(state)
+      writeFileSync(join(slot.stateDir, `${dd.patch}.json`), json)
+      // On ne garde que l'état du patch en cours.
+      for (const f of readdirSync(slot.stateDir))
+        if (f.endsWith('.json') && f !== `${dd.patch}.json`) rmSync(join(slot.stateDir, f))
+
+      const meta = buildMeta(state, dd, previous, { minGames: config.minGames, role: slot.role })
+      meta.bracket = bracket.key
+      meta.role = slot.role
+      if (slot.role === mainRole) profiles = meta.profiles
+      else if (profiles) meta.profiles = profiles
+      writeFileSync(slot.metaFile, JSON.stringify(meta, null, 2) + '\n')
+
+      const L = `[${slot.label}]`
+      const mb = (json.length / 1e6).toFixed(1)
+      log(
+        `${L} ${slot.records} joueurs ajoutés, ${meta.sampleGames} sur le patch, ${meta.freshBuilds} builds à jour, ${meta.builds.length} au total (état : ${mb} Mo).`
+      )
+      if (json.length > 80e6) log(`${L} ATTENTION : état de ${mb} Mo, proche de la limite de 100 Mo de GitHub.`)
+      if (meta.backtest) log(`${L} backtest : ${JSON.stringify(meta.backtest)}`)
+      if (meta.tuning) log(`${L} réglage du moteur : ${JSON.stringify(meta.tuning)}`)
+      else log(`${L} réglage du moteur : ${Math.round(state.tuning.n)} parties (il en faut 2000)`)
+    }
   }
   log(`Requêtes : ${riot.stats.requests}, limites atteintes : ${riot.stats.rateLimited}.`)
 }

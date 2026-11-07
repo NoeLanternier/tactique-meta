@@ -11,12 +11,20 @@ désactiver). L'app la prend pour les joueurs de ces rangs et garde la méta Mas
 champions qui n'y ont pas encore assez de parties. Les deux collectes tournent en même temps et se
 partagent les limites de la clé : sur `euw1` et `na1`, chacune a environ la moitié des requêtes.
 
+**Tous les postes.** Les mêmes parties servent aux cinq postes, sans requête de plus : chaque partie
+contient les dix joueurs. La jungle garde `meta.json` (et `meta-gold.json`) ; les autres postes ont
+leur fichier : `meta-top.json`, `meta-mid.json`, `meta-bot.json`, `meta-support.json` (et
+`meta-gold-top.json`…). Pour chaque poste, « l'adversaire direct » (`vs`, combats par période) est
+le joueur d'en face au même poste ; le familier et le début de partie ne concernent que la jungle.
+Variable `ROLES` pour limiter les postes collectés (ex. `jungle,mid`). Les compteurs sont dans
+`state/<poste>/` (`state/gold/<poste>/` pour Or à Émeraude), la jungle restant dans `state/`.
+
 ## Fonctionnement
 
 1. Récupère les joueurs Master+ de chaque région (`euw1`, `kr`, `na1`, `sg2` par défaut : une
    région par grande zone, chacune a ses propres limites de requêtes).
 2. Lit leurs parties classées solo du patch en cours (les remakes et parties < 15 min sont ignorés).
-3. Pour chaque jungler : page de runes complète, ordre réel d'achat (timeline), bottes, familier,
+3. Pour chaque joueur (tous les postes) : page de runes complète, ordre réel d'achat (timeline), bottes, familier (jungle),
    ordre de montée des compétences, victoire ou défaite.
 4. Choisit pour chaque champion les options au **meilleur taux de victoire lissé** parmi celles
    jouées dans au moins 8 à 15 % des parties (une option rare ne peut pas gagner par chance).
@@ -73,7 +81,7 @@ npm start                         # collecte complète (90 min par défaut, 180 
 npm test                          # tests sur données simulées
 ```
 
-Options : `--minutes 90`, `--regions euw1,kr,na1`, `--gold-regions euw1` (vide : pas de méta Or), `--min-games 40`, `--out dossier`.
+Options : `--minutes 90`, `--roles jungle,mid`, `--regions euw1,kr,na1`, `--gold-regions euw1` (vide : pas de méta Or), `--min-games 40`, `--out dossier`.
 
 ## Limites
 

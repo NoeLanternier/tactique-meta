@@ -791,6 +791,12 @@ export function buildMeta(state, dd, previousMeta, options = {}) {
     if (variants.length) b.variants = variants
     const choices = buildChoices(c, dd)
     if (Object.keys(choices).length) b.choices = choices
+    // Hors jungle : pas de familier.
+    if (options.role && options.role !== 'jungle') {
+      b.pet = null
+      for (const v of b.variants ?? []) v.pet = null
+      delete b.choices?.pet
+    }
     builds.push(b)
   }
   const fresh = new Set(builds.map((b) => b.id))

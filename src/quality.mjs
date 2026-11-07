@@ -3,7 +3,7 @@
 // de ses réponses, ces parts s'effondrent : mieux vaut alors ne rien publier.
 
 export function emptyQuality() {
-  return { records: 0, runes: 0, items: 0, skills: 0, timeline: 0 }
+  return { records: 0, runes: 0, items: 0, skills: 0, timeline: 0, timelineRecords: 0 }
 }
 
 export function recordQuality(q, rec) {
@@ -11,7 +11,11 @@ export function recordQuality(q, rec) {
   if (rec.runeSig) q.runes++
   if ((rec.items ?? []).length > 0) q.items++
   if (rec.skills) q.skills++
-  if (rec.opening?.side) q.timeline++
+  // Position à 2 minutes : relevée pour les junglers seulement.
+  if (!rec.role || rec.role === 'jungle') {
+    q.timelineRecords++
+    if (rec.opening?.side) q.timeline++
+  }
 }
 
 /** Parts minimales observées en temps normal (avec une bonne marge). */
@@ -29,7 +33,9 @@ export function qualityIssues(q) {
   if (q.records < MIN_RECORDS) return []
   const issues = []
   for (const [k, min] of Object.entries(MIN_SHARE)) {
-    const share = q[k] / q.records
+    const total = k === 'timeline' ? (q.timelineRecords ?? q.records) : q.records
+    if (total < MIN_RECORDS / 5) continue
+    const share = q[k] / total
     if (share < min)
       issues.push(`${LABEL[k]} trouvé(e)s pour ${Math.round(share * 100)} % des junglers (attendu ≥ ${min * 100} %)`)
   }

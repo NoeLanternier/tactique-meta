@@ -206,11 +206,34 @@ export function openingOf(timeline, pid) {
  * `items` / `itemMin` : les 6 premiers objets légendaires et la minute de leur achat ;
  * `foeTags` : caractéristiques des objets adverses (voir FOE_TRAITS).
  */
+/** Postes Riot (teamPosition) → clés des métas. */
+export const ROLE_OF_POSITION = {
+  TOP: 'top',
+  JUNGLE: 'jungle',
+  MIDDLE: 'mid',
+  BOTTOM: 'bot',
+  UTILITY: 'support'
+}
+export const ROLES = Object.values(ROLE_OF_POSITION)
+
+/** Junglers d'une partie (voir extractPlayers). */
 export function extractJunglers(match, timeline, dd) {
+  return extractPlayers(match, timeline, dd, ['jungle'])
+}
+
+/**
+ * Joueurs d'une partie aux postes demandés. `enemyJungler` : l'adversaire direct (le jungler
+ * adverse pour un jungler, le joueur d'en face sur la même voie sinon) ; `enemies` : les autres
+ * adversaires.
+ */
+export function extractPlayers(match, timeline, dd, roles = ROLES) {
   const info = match.info
   const events = eventsByParticipant(timeline)
   const records = []
-  for (const p of info.participants.filter((x) => x.teamPosition === 'JUNGLE')) {
+  const wanted = (x) => roles.includes(ROLE_OF_POSITION[x.teamPosition])
+  for (const p of info.participants.filter(wanted)) {
+    const role = ROLE_OF_POSITION[p.teamPosition]
+    const jungle = role === 'jungle'
     const champ = dd.champById.get(p.championId) ?? p.championName
     const styles = p.perks?.styles ?? []
     const primary = styles.find((s) => s.description === 'primaryStyle') ?? styles[0]
@@ -234,12 +257,12 @@ export function extractJunglers(match, timeline, dd) {
       }
     }
     const boots = bought.find((id) => dd.items.get(id)?.isBoots) ?? null
-    const pet = bought.find((id) => dd.items.get(id)?.isPet) ?? null
+    const pet = jungle ? (bought.find((id) => dd.items.get(id)?.isPet) ?? null) : null
 
     // Contexte adverse réellement observé dans cette partie (dégâts, soins, résistance, contrôles).
     const foes = info.participants.filter((x) => x.teamId !== p.teamId)
     const sum = (f) => foes.reduce((acc, x) => acc + (Number(x[f]) || 0), 0)
-    const enemyJungler = foes.find((x) => x.teamPosition === 'JUNGLE')
+    const enemyJungler = foes.find((x) => x.teamPosition === p.teamPosition)
     const champOf = (x) => dd.champById.get(x.championId) ?? x.championName
     // Composition des deux équipes (synergies avec les alliés, affrontements avec les adversaires).
     const allies = info.participants
@@ -249,6 +272,7 @@ export function extractJunglers(match, timeline, dd) {
 
     const myEvents = events.get(p.participantId) ?? []
     records.push({
+      role,
       champ,
       bench: benchOf(info, p, timeline, myEvents, dd),
       win: Boolean(p.win),
@@ -267,7 +291,7 @@ export function extractJunglers(match, timeline, dd) {
       foeTags: foeTagsOf(foes, dd),
       // Combats contre le jungler adverse et début de partie (côté, première élimination).
       duels: junglerDuels(timeline, p.participantId, enemyJungler?.participantId),
-      opening: openingOf(timeline, p.participantId),
+      opening: jungle ? openingOf(timeline, p.participantId) : null,
       enemy: {
         minutes: (info.gameDuration ?? 0) / 60,
         phys: sum('physicalDamageDealtToChampions'),

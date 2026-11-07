@@ -62,7 +62,7 @@ function match(id) {
     teamId: i < 5 ? 100 : 200,
     championId,
     championName: 'X',
-    teamPosition: i === 0 || i === 5 ? 'JUNGLE' : 'MIDDLE',
+    teamPosition: ['JUNGLE', 'TOP', 'MIDDLE', 'BOTTOM', 'UTILITY'][i % 5],
     win: i < 5 ? win : !win,
     perks: broken ? {} : page,
     physicalDamageDealtToChampions: 10000 + rand() * 20000,
@@ -83,7 +83,7 @@ function match(id) {
   }))
   const frames = Array.from({ length: 31 }, (_, m) => ({
     timestamp: m * 60000,
-    events: m === 0 ? [...buys(1), ...buys(6), ...skills(1), ...skills(6)] : m === 4
+    events: m === 0 ? Array.from({ length: 10 }, (_, k) => [...buys(k + 1), ...skills(k + 1)]).flat() : m === 4
       ? [{ type: 'CHAMPION_KILL', killerId: 1, victimId: 6, assistingParticipantIds: [], timestamp: 240000, position: { x: 7000, y: 7400 } }]
       : [],
     participantFrames: Object.fromEntries(Array.from({ length: 10 }, (_, i) => [String(i + 1), {

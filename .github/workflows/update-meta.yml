@@ -58,6 +58,10 @@ jobs:
           REGIONS: ${{ vars.REGIONS || 'euw1,kr,na1,sg2' }}
           # Variable GOLD_REGIONS : régions de la méta Or à Émeraude (« none » pour la désactiver).
           GOLD_REGIONS: ${{ vars.GOLD_REGIONS == 'none' && ' ' || vars.GOLD_REGIONS || 'euw1,na1' }}
+          # Variable ROLES : postes collectés (tous par défaut).
+          ROLES: ${{ vars.ROLES || 'top,jungle,mid,bot,support' }}
+          # Cinq postes et deux niveaux en mémoire : on laisse plus de place à Node.
+          NODE_OPTIONS: --max-old-space-size=6144
         run: node src/run.mjs
 
       - name: Sauvegarde de l'état (branche data)
@@ -82,8 +86,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # state/ n'est plus suivi sur main (il est sur la branche data).
           git rm -r -q --cached --ignore-unmatch state
-          git add -A meta.json
-          if [ -f meta-gold.json ]; then git add meta-gold.json; fi
+          # meta.json (jungle Master+), meta-top.json…, meta-gold.json, meta-gold-top.json…
+          git add -A -- 'meta*.json'
           if [ -f .gitignore ]; then git add .gitignore; fi
           if git diff --cached --quiet; then
             echo "Aucun changement."

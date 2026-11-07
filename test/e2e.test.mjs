@@ -29,11 +29,22 @@ test('collecte complète : Master+ et Or à Émeraude, puis réglage le lendemai
   assert.equal(master.junglers.LeeSin.banRate, 0)
   assert.ok(existsSync(join(out, 'state', '16.21.json')))
   assert.ok(existsSync(join(out, 'state', 'gold', '16.21.json')))
+  // Une méta par poste, pour chaque niveau (la jungle garde meta.json).
+  for (const role of ['top', 'mid', 'bot', 'support']) {
+    const m = JSON.parse(readFileSync(join(out, `meta-${role}.json`), 'utf-8'))
+    assert.equal(m.role, role)
+    assert.ok(m.builds.length > 0 && m.builds.every((b) => b.pet === null))
+    assert.ok(Object.keys(m.profiles).length > 0) // profils repris de la jungle
+    assert.ok(existsSync(join(out, `meta-gold-${role}.json`)))
+    assert.ok(existsSync(join(out, 'state', role, '16.21.json')))
+  }
+  assert.equal(master.role, 'jungle')
 
   // Le lendemain (mêmes parties déjà vues) : la méta de la veille sert au backtest et au réglage.
   const second = run({ MOCK_DAY: '2' })
   assert.equal(second.status, 0, second.stdout + second.stderr)
   assert.match(second.stdout, /\[Master\+\] réglage du moteur : 1200 parties/)
+  assert.match(second.stdout, /\[Master\+ · top\] réglage du moteur : 1200 parties/)
   assert.match(second.stdout, /\[Or à Émeraude\] réglage du moteur : 400 parties/)
   assert.match(second.stdout, /\[Master\+\] backtest/)
   // Les parties déjà vues ne sont pas recomptées.
