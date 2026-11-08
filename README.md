@@ -1,6 +1,6 @@
 # Tactique Meta
 
-Calcule chaque jour les meilleurs builds jungle (runes, cœur d'objets, bottes, familier, ordre des
+Calcule 4 fois par jour les meilleurs builds jungle (runes, cœur d'objets, bottes, familier, ordre des
 compétences) à partir des parties classées **Master, Grandmaster et Challenger** du patch en cours,
 grâce à l'API officielle de Riot. Le résultat, `meta.json`, est lu par l'Analyseur Tactique
 (Réglages → Mise à jour de la méta).
@@ -77,7 +77,7 @@ premier jour.
 ```powershell
 $env:RIOT_API_KEY = "RGAPI-..."   # votre clé
 npm run test-rapide               # 3 minutes sur EUW, résultat dans test-local/
-npm start                         # collecte complète (90 min par défaut, 180 sur GitHub)
+npm start                         # collecte complète (90 min par défaut ; sur GitHub, 300 min toutes les 6 heures)
 npm test                          # tests sur données simulées
 ```
 
@@ -87,7 +87,8 @@ Options : `--minutes 90`, `--roles jungle,mid`, `--regions euw1,kr,na1`, `--gold
 
 - Les limites de requêtes sont lues dans les réponses de Riot et le journal indique le type de clé
   (« Limites de la clé … → clé production »). Clé personnelle : 100 requêtes / 2 minutes par région,
-  soit environ 1 500 parties par heure et par région. Clé de production : en général 500 requêtes /
+  soit environ 1 500 parties par heure et par région. Sur GitHub, 4 collectes de 5 heures par jour
+  (toutes les 6 heures) utilisent la clé environ 20 heures sur 24. Clé de production : en général 500 requêtes /
   10 secondes, la collecte va alors bien plus vite.
 - GitHub peut désactiver une tâche planifiée d'un dépôt public après 60 jours sans activité. Si vous
   recevez l'e-mail d'avertissement, ouvrez l'onglet Actions et cliquez sur « Enable workflow ».

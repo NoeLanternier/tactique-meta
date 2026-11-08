@@ -1,18 +1,19 @@
-# Met à jour chaque jour meta.json (parties classées Master+) et meta-gold.json (Or à Émeraude),
-# à partir de l'API officielle de Riot.
+# Met à jour 4 fois par jour meta.json (parties classées Master+), meta-gold.json (Or à Émeraude)
+# et les métas des autres postes, à partir de l'API officielle de Riot.
 name: Mettre à jour la méta
 
 on:
   schedule:
-    # Tous les jours à 04h17 UTC (05h17 heure de Paris en hiver, 06h17 en été).
-    - cron: '17 4 * * *'
+    # Toutes les 6 heures : 04h17, 10h17, 16h17 et 22h17 UTC (+1 h à Paris en hiver, +2 h en été).
+    # Chaque exécution collecte 5 heures : la clé est utilisée environ 20 heures par jour.
+    - cron: '17 4,10,16,22 * * *'
   # Bouton « Run workflow » dans l'onglet Actions pour lancer à la main.
   workflow_dispatch:
     inputs:
       minutes:
         description: 'Durée de collecte en minutes'
         required: false
-        default: '180'
+        default: '300'
 
 permissions:
   contents: write
@@ -25,7 +26,8 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    # Limite de GitHub : 6 heures par exécution.
+    timeout-minutes: 340
     steps:
       # On part de la DERNIÈRE version de main au moment où l'exécution démarre (et non de celle
       # du moment où elle a été déclenchée), pour récupérer le travail d'une exécution précédente.
@@ -54,7 +56,7 @@ jobs:
       - name: Collecte des parties et calcul des builds
         env:
           RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
-          MINUTES: ${{ github.event.inputs.minutes || '180' }}
+          MINUTES: ${{ github.event.inputs.minutes || '300' }}
           REGIONS: ${{ vars.REGIONS || 'euw1,kr,na1,sg2' }}
           # Variable GOLD_REGIONS : régions de la méta Or à Émeraude (« none » pour la désactiver).
           GOLD_REGIONS: ${{ vars.GOLD_REGIONS == 'none' && ' ' || vars.GOLD_REGIONS || 'euw1,na1' }}
@@ -75,7 +77,7 @@ jobs:
           git add -A
           git -c user.name="tactique-meta-bot" \
               -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-              commit -q -m "État du $(date -u +%Y-%m-%d)"
+              commit -q -m "État du $(date -u '+%Y-%m-%d %Hh')"
           git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" data
 
       - name: Publication des métas
@@ -93,7 +95,7 @@ jobs:
             echo "Aucun changement."
             exit 0
           fi
-          git commit -m "Méta du $(date -u +%Y-%m-%d)"
+          git commit -m "Méta du $(date -u '+%Y-%m-%d %Hh') UTC"
           # Si main a bougé entre-temps, on se replace dessus en gardant les nouvelles données.
           for attempt in 1 2 3; do
             if git push; then exit 0; fi
