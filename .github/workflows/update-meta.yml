@@ -1,12 +1,15 @@
 # Met à jour 4 fois par jour meta.json (parties classées Master+), meta-gold.json (Or à Émeraude)
-# et les métas des autres postes, à partir de l'API officielle de Riot.
+# et les métas des autres postes, à partir de l'API officielle de Riot. Publiées sur la branche
+# « meta » (lue par l'app) et, une fois par jour, sur main.
 name: Mettre à jour la méta
 
 on:
   schedule:
     # Toutes les 6 heures : 04h17, 10h17, 16h17 et 22h17 UTC (+1 h à Paris en hiver, +2 h en été).
     # Chaque exécution collecte 5 heures : la clé est utilisée environ 20 heures par jour.
-    - cron: '17 4,10,16,22 * * *'
+    # L'exécution de 04h17 met aussi à jour la copie des métas sur main (anciennes versions de l'app).
+    - cron: '17 4 * * *'
+    - cron: '17 10,16,22 * * *'
   # Bouton « Run workflow » dans l'onglet Actions pour lancer à la main.
   workflow_dispatch:
     inputs:
@@ -48,6 +51,12 @@ jobs:
           else
             echo "Pas encore de branche data : état de main."
           fi
+          # Dernières métas publiées (branche meta, plus récente que main) : base de la nouvelle méta.
+          if git fetch -q --depth=1 origin meta; then
+            git checkout FETCH_HEAD -- 'meta*.json'
+            git reset -q -- 'meta*.json'
+            echo "Métas reprises de la branche meta."
+          fi
 
       - uses: actions/setup-node@v5
         with:
@@ -80,7 +89,25 @@ jobs:
               commit -q -m "État du $(date -u '+%Y-%m-%d %Hh')"
           git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" data
 
-      - name: Publication des métas
+      # Métas publiées sur la branche « meta », réécrite à chaque fois (comme « data ») : l'app les
+      # lit là, toutes les 6 heures, sans que l'historique du dépôt grossisse.
+      - name: Publication des métas (branche meta)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tmp="$(mktemp -d)"
+          cp meta*.json "$tmp/"
+          cd "$tmp"
+          git init -q -b meta
+          git add -A
+          git -c user.name="tactique-meta-bot" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "Méta du $(date -u '+%Y-%m-%d %Hh') UTC"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" meta
+
+      # Copie sur main une fois par jour seulement (anciennes versions de l'app, et secours).
+      - name: Copie quotidienne des métas (branche main)
+        if: github.event.schedule == '17 4 * * *' || github.event_name == 'workflow_dispatch'
         env:
           BRANCH: ${{ github.event.repository.default_branch }}
         run: |

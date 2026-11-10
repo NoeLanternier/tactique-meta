@@ -278,3 +278,34 @@ test('meta v2 : profils, stats de junglers, objets par contexte, reprise du patc
   assert.equal(seeded.champs.LeeSin.bench.cs10[1] / seeded.champs.LeeSin.bench.cs10[0], 70)
   assert.equal(seeded.seededFrom, '16.21')
 })
+
+test('contextes adverses : composition attendue (profils), pas l’issue de la partie', async () => {
+  const { expectedEnemy, classifyContexts, contextsOf, emptyState, upgradeState, addRecord } = await import('../src/aggregate.mjs')
+  const profiles = {}
+  for (let i = 0; i < 12; i++) profiles[`C${i}`] = { g: 50, minutes: 1500, phys: 1500 * 600, magic: 1500 * 300, heal: 1500 * 100, tank: 1500 * 1000, cc: 1500 * 2 }
+  // Soraka : gros soins par minute.
+  profiles.Soraka = { g: 80, minutes: 2400, phys: 2400 * 100, magic: 2400 * 400, heal: 2400 * 900, tank: 2400 * 600, cc: 2400 * 1 }
+  const normal = expectedEnemy(profiles, ['C1', 'C2', 'C3', 'C4', 'C5'])
+  const healer = expectedEnemy(profiles, ['C1', 'C2', 'C3', 'C4', 'Soraka'])
+  assert.equal(normal.minutes, 1)
+  assert.ok(healer.heal > normal.heal * 2)
+  // Champion inconnu : profil moyen ; profils trop peu nombreux : pas de contexte.
+  assert.ok(expectedEnemy(profiles, ['Inconnu']).heal > 0)
+  assert.equal(expectedEnemy({}, ['C1']), null)
+  assert.deepEqual(classifyContexts(emptyState('16.22', 0), null), ['all'])
+  // Seuils appris sur les compositions attendues : l'équipe avec Soraka est « soins ».
+  const st = emptyState('16.22', 0)
+  for (let i = 0; i < 300; i++) contextsOf(st, i % 10 === 0 ? healer : normal)
+  assert.ok(classifyContexts(st, healer).includes('heal'))
+  assert.ok(!classifyContexts(st, normal).includes('heal'))
+  // État d'avant (version 5) : compteurs par contexte retirés sauf 'all', réglage remis à zéro.
+  const old = emptyState('16.22', 0)
+  addRecord(old, { champ: 'LeeSin', win: true, runeSig: null, core: [1], later: [], items: [1], boots: null, pet: null, skills: null, enemy: { minutes: 1, phys: 1, magic: 0, heal: 0, tank: 0, cc: 0 } })
+  old.champs.LeeSin.ctxBase.heal = [5, 1]
+  old.tuning.n = 5000
+  old.version = 5
+  const up = upgradeState(old)
+  assert.deepEqual(Object.keys(up.champs.LeeSin.ctxBase), ['all'])
+  assert.equal(up.tuning.n, 0)
+  assert.equal(up.version, 6)
+})

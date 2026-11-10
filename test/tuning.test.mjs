@@ -89,7 +89,8 @@ test('critères calculés comme dans l’app', () => {
   }
   const f = tuningFeatures(meta, rec, ['all', 'ap'], dd)
   console.log(f)
-  assert.ok(Math.abs(f.pick - ((0.51 * 2000 + 30) / 2060 - 0.5)) < 1e-9)
+  // Lissage bayésien empirique (moins de 10 champions mesurés : moyenne 0,5 et 600 parties a priori).
+  assert.ok(Math.abs(f.pick - ((0.51 * 2000 + 0.5 * 600) / 2600 - 0.5)) < 1e-9)
   assert.ok(f.vs > 0.03)
   assert.ok(f.famBase > 0.01 && f.famCtx > 0.03) // Sundered Sky, meilleure vs AP
   assert.ok(f.choiceCtx > 0.03) // Mercure vs AP
@@ -99,4 +100,16 @@ test('critères calculés comme dans l’app', () => {
   const g = tuningFeatures(meta, { ...rec, core: [3] }, ['all', 'ap'], dd)
   assert.equal(g.famBase, 0)
   assert.equal(g.famCtx, 0)
+})
+
+test('lissage bayésien empirique : écarts réels petits → fort lissage', async () => {
+  const { shrinkPrior } = await import('../src/tuning.mjs')
+  const junglers = {}
+  // 30 champions entre 49 % et 51 % sur 1 000 à 3 000 parties : presque tout l'écart est du hasard.
+  for (let i = 0; i < 30; i++) junglers[`C${i}`] = { games: 1000 + i * 70, winRate: 0.49 + (i % 5) * 0.005 }
+  const p = shrinkPrior(junglers)
+  assert.ok(Math.abs(p.mean - 0.5) < 0.005)
+  assert.ok(p.k >= 600, `k = ${p.k}`)
+  // Peu de champions : valeurs par défaut.
+  assert.deepEqual(shrinkPrior({ A: { games: 500, winRate: 0.6 } }), { mean: 0.5, k: 600 })
 })

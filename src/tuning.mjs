@@ -65,12 +65,12 @@ function contextShift(cells, base, contexts) {
 }
 
 /** Effet « général » d'un allié ou adversaire, commun à tous les junglers (retiré dans l'app). */
-function generalEffects(meta) {
+function generalEffects(meta, prior) {
   const out = { with: new Map(), against: new Map() }
   for (const side of ['with', 'against']) {
     const acc = new Map()
     for (const j of Object.values(meta.junglers ?? {})) {
-      const base = smooth(j.games, j.winRate, 0.5, 60)
+      const base = smooth(j.games, j.winRate, prior.mean, prior.k)
       for (const [champ, pair] of Object.entries(j[side] ?? {})) {
         const d = logit(smooth(pair[0], pair[1], base, PAIR_K)) - logit(base)
         const a = acc.get(champ) ?? [0, 0]
@@ -84,13 +84,30 @@ function generalEffects(meta) {
   return out
 }
 
+/**
+ * Lissage du taux de victoire d'un champion (bayésien empirique, comme dans l'app) : moyenne du
+ * poste et nombre de parties « a priori » mesuré sur la méta (méthode des moments), borné.
+ */
+export function shrinkPrior(junglers) {
+  const rows = Object.values(junglers ?? {}).filter((s) => s.games >= 100)
+  const total = rows.reduce((t, s) => t + s.games, 0)
+  if (rows.length < 10 || total === 0) return { mean: 0.5, k: 600 }
+  const mean = rows.reduce((t, s) => t + s.games * s.winRate, 0) / total
+  const observed = rows.reduce((t, s) => t + s.games * (s.winRate - mean) ** 2, 0) / total
+  const noise = (rows.length * mean * (1 - mean)) / total
+  const between = Math.max(observed - noise, 0.0001)
+  return { mean, k: clamp((mean * (1 - mean)) / between, 200, 2500) }
+}
+
 const cache = new WeakMap()
 function prepared(meta) {
   let p = cache.get(meta)
   if (!p) {
+    const prior = shrinkPrior(meta.junglers)
     p = {
       builds: new Map((meta.builds ?? []).map((b) => [b.id, b])),
-      general: generalEffects(meta)
+      prior,
+      general: generalEffects(meta, prior)
     }
     cache.set(meta, p)
   }
@@ -102,15 +119,15 @@ function prepared(meta) {
  * `meta` (méta de la veille). `contexts` : contextes adverses de la partie ('all', 'ap'…).
  */
 export function tuningFeatures(meta, rec, contexts, dd) {
-  const { builds, general } = prepared(meta)
+  const { builds, general, prior: shrink } = prepared(meta)
   const f = Object.fromEntries(TUNING_KEYS.map((k) => [k, 0]))
   const itemName = (id) => (id === null || id === undefined ? null : dd.items.get(Number(id))?.name)
 
   // Draft : force du champion, jungler adverse, alliés et adversaires.
   const s = meta.junglers?.[rec.champ]
   if (s) {
-    const base = smooth(s.games, s.winRate, 0.5, 60)
-    f.pick = base - 0.5
+    const base = smooth(s.games, s.winRate, shrink.mean, shrink.k)
+    f.pick = base - shrink.mean
     const vs = rec.enemyJungler ? s.vs?.[rec.enemyJungler] : null
     if (vs) f.vs = smooth(vs[0], vs[1], base, 25) - base
     let sum = 0

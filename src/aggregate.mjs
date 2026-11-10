@@ -6,7 +6,7 @@
 import { emptyTuning, solveTuning } from './tuning.mjs'
 import { ARCHETYPES, guessArchetype } from './archetypes.mjs'
 
-export const STATE_VERSION = 5
+export const STATE_VERSION = 6
 /** Contextes adverses pour lesquels on mesure la performance des objets. */
 export const CONTEXTS = ['all', 'ap', 'ad', 'heal', 'tank', 'cc']
 const CONTEXT_METRICS = ['heal', 'tank', 'cc']
@@ -42,8 +42,34 @@ export function emptyBacktest() {
   }
 }
 
+/**
+ * Version 6 : contextes adverses tirés de la composition (profils des champions) et non plus de ce
+ * qui s'est passé dans la partie. Les compteurs par contexte d'avant sont retirés (ils se
+ * remplissent à nouveau en quelques collectes) ; 'all' et tout le reste sont gardés. Le réglage du
+ * moteur repart de zéro (ses critères ont changé).
+ */
+function dropOldContexts(state) {
+  const keepAll = (m) => {
+    if (!m || typeof m !== 'object') return
+    for (const k of Object.keys(m)) if (k !== 'all') delete m[k]
+  }
+  for (const c of Object.values(state.champs ?? {})) {
+    keepAll(c.ctxBase)
+    keepAll(c.ctxItems)
+    keepAll(c.ctxSlots)
+    for (const kind of Object.values(c.opt ?? {})) keepAll(kind)
+    for (const f of Object.values(c.fam ?? {})) {
+      keepAll(f.ctxBase)
+      keepAll(f.ctxRunes)
+    }
+  }
+  state.ctxStats = {}
+  state.tuning = emptyTuning()
+}
+
 /** Ajoute les champs des nouvelles versions à un état plus ancien. */
 export function upgradeState(state) {
+  if ((state.version ?? 0) < 6) dropOldContexts(state)
   state.profiles ??= {}
   state.ctxStats ??= {}
   state.itemAll ??= {}
@@ -140,6 +166,28 @@ function isHigh(state, metric, value) {
   return (value - mean) / sd > HIGH_Z
 }
 
+const ENEMY_KEYS = ['phys', 'magic', 'heal', 'tank', 'cc']
+
+/**
+ * Composition adverse attendue avant la partie : somme des profils moyens (par minute) des cinq
+ * adversaires, comme l'app les estime pendant la draft. Les valeurs réellement observées dans la
+ * partie dépendent de son issue (une équipe qui gagne soigne et encaisse davantage) et faussaient
+ * les taux par contexte. Null tant que les profils sont trop peu nombreux (contexte 'all' seul).
+ */
+export function expectedEnemy(profiles, foes, minGames = 20) {
+  const known = Object.values(profiles ?? {}).filter((p) => p.g >= minGames && p.minutes > 0)
+  if (known.length < 10 || !foes?.length) return null
+  const avg = {}
+  for (const k of ENEMY_KEYS) avg[k] = known.reduce((s, p) => s + p[k] / p.minutes, 0) / known.length
+  const out = { minutes: 1, phys: 0, magic: 0, heal: 0, tank: 0, cc: 0 }
+  for (const champ of foes) {
+    const p = profiles[champ]
+    const ok = p && p.g >= minGames && p.minutes > 0
+    for (const k of ENEMY_KEYS) out[k] += ok ? p[k] / p.minutes : avg[k]
+  }
+  return out
+}
+
 /** Contextes adverses d'une partie, sans mettre à jour les statistiques (lecture seule). */
 export function classifyContexts(state, enemy) {
   const ctx = ['all']
@@ -154,7 +202,7 @@ export function classifyContexts(state, enemy) {
   return ctx
 }
 
-/** Contextes adverses d'une partie, à partir de ce qui a été réellement observé. */
+/** Contextes adverses d'une partie (composition attendue, voir expectedEnemy). */
 export function contextsOf(state, enemy) {
   const ctx = classifyContexts(state, enemy)
   if (enemy?.minutes) for (const m of CONTEXT_METRICS) observe(state, m, enemy[m] / enemy.minutes)

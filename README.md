@@ -19,6 +19,17 @@ le joueur d'en face au même poste ; le familier et le début de partie ne conce
 Variable `ROLES` pour limiter les postes collectés (ex. `jungle,mid`). Les compteurs sont dans
 `state/<poste>/` (`state/gold/<poste>/` pour Or à Émeraude), la jungle restant dans `state/`.
 
+**Publication.** Les métas sont publiées à chaque exécution sur la branche `meta`, réécrite à chaque
+fois (l'app lit `https://raw.githubusercontent.com/NoeLanternier/tactique-meta/meta/meta.json` et
+ses voisins) : l'historique du dépôt ne grossit pas. Une copie est faite sur `main` une fois par
+jour (exécution de 04h17 UTC), pour les anciennes versions de l'app et comme secours.
+
+**Contexte adverse.** Les taux « face à une équipe AP, AD, qui soigne, résistante, à contrôles »
+sont classés d'après la composition adverse attendue : profils moyens des cinq champions adverses
+(comme l'app pendant la draft), et non ce qui s'est passé dans la partie. Une équipe qui gagne
+soigne et encaisse davantage : les valeurs observées liaient le contexte à l'issue de la partie
+(tous les champions avaient ~28 % « face aux soins »).
+
 ## Fonctionnement
 
 1. Récupère les joueurs Master+ de chaque région (`euw1`, `kr`, `na1`, `sg2` par défaut : une

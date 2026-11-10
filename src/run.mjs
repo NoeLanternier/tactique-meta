@@ -21,6 +21,7 @@ import {
   buildMeta,
   classifyContexts,
   emptyState,
+  expectedEnemy,
   seedFromPrevious,
   upgradeState
 } from './aggregate.mjs'
@@ -50,6 +51,9 @@ const config = {
   roles: list(arg('roles', process.env.ROLES || ROLES.join(','))).filter((r) => ROLES.includes(r)),
   matchesPerPlayer: 20
 }
+
+/** Définition des contextes adverses des métas publiées (composition attendue, voir aggregate). */
+const CONTEXT_KIND = 'composition'
 
 // --out : dossier de sortie (test local dans un dossier séparé pour ne pas polluer la vraie méta).
 const OUT_DIR = arg('out', '.')
@@ -234,10 +238,16 @@ async function main() {
         for (const rec of extractPlayers(match, timeline, dd, config.roles)) {
           const slot = roles.get(rec.role)
           if (!slot) continue
+          // Contexte adverse : composition attendue (profils des champions), pas l'issue de la partie.
+          rec.enemy = expectedEnemy(
+            main.profiles,
+            [rec.enemyJungler, ...(rec.enemies ?? [])].filter(Boolean)
+          )
           // Contrôle des données : les supports achètent leur premier objet plus tard, on ne
           // les compte pas (les seuils sont faits pour les autres postes).
           if (rec.role !== 'support') recordQuality(quality, rec)
-          if (slot.previous?.patch === dd.patch) {
+          // Backtest et réglage : avec la méta précédente, si ses contextes sont du même type.
+          if (slot.previous?.patch === dd.patch && slot.previous?.contexts === CONTEXT_KIND) {
             const contexts = classifyContexts(slot.state, rec.enemy)
             evaluateRecord(slot.previous, contexts, rec, slot.state.backtest, dd)
             addTuning(slot.state.tuning, tuningFeatures(slot.previous, rec, contexts, dd), rec.win)
@@ -300,6 +310,7 @@ async function main() {
       const meta = buildMeta(state, dd, previous, { minGames: config.minGames, role: slot.role })
       meta.bracket = bracket.key
       meta.role = slot.role
+      meta.contexts = CONTEXT_KIND
       if (slot.role === mainRole) profiles = meta.profiles
       else if (profiles) meta.profiles = profiles
       writeFileSync(slot.metaFile, JSON.stringify(meta, null, 2) + '\n')
