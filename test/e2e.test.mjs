@@ -23,6 +23,10 @@ test('collecte complète : Master+ et Or à Émeraude, puis réglage le lendemai
   assert.equal(master.bracket, 'master')
   assert.equal(gold.bracket, 'gold')
   assert.ok(master.builds.some((b) => b.id === 'LeeSin'))
+  // Départs courants avec leur part (ici tous les joueurs commencent par le familier).
+  const lee = master.builds.find((b) => b.id === 'LeeSin')
+  assert.deepEqual(lee.startOptions[0].items, ['Scorchclaw Pup'])
+  assert.equal(lee.startOptions[0].share, 1)
   assert.ok(gold.sampleGames > 0)
   // Taux de victoire selon la composition adverse, et taux de bannissement.
   assert.equal(master.junglers.Viego.banRate, 1)

@@ -510,6 +510,20 @@ export function selectBuild(champ, c, dd, { minGames = 40 } = {}) {
   const start = startSig
     ? startSig.split(',').map((id) => itemName(id)).filter(Boolean)
     : []
+  // Départs courants (au moins 8 % des parties), comme les choix proposés par la boutique : l'app
+  // les affiche avec leur part et leur taux de victoire.
+  const startTotal = Object.values(c.start ?? {}).reduce((t, [g]) => t + g, 0)
+  const startOptions = Object.entries(c.start ?? {})
+    .filter(([sigKey, [g]]) => sigKey && g >= 10 && g / Math.max(1, startTotal) >= 0.08)
+    .sort((x, y) => y[1][0] - x[1][0])
+    .slice(0, 3)
+    .map(([sigKey, [g, w]]) => ({
+      items: sigKey.split(',').map((id) => itemName(id)).filter(Boolean),
+      games: Math.round(g),
+      share: round3(g / startTotal),
+      winRate: round3(bayes(g, w, prior, 30))
+    }))
+    .filter((o) => o.items.length)
   const coreItems = core.map((id) => dd.items.get(Number(id)))
 
   return {
@@ -521,6 +535,7 @@ export function selectBuild(champ, c, dd, { minGames = 40 } = {}) {
     options,
     skills,
     ...(start.length ? { start } : {}),
+    ...(startOptions.length ? { startOptions } : {}),
     runes,
     situational: situationalStats(c, dd),
     patch: dd.patch,
