@@ -92,6 +92,7 @@ function rec({ win, items, foes = ['Garen'], foeTags = [], champ = 'LeeSin' }) {
     later: items.slice(3, 6),
     items,
     itemMin: items.map((_, k) => 12 + k * 6),
+    itemState: items.map(() => 'e'),
     boots: 3047,
     pet: 1101,
     skills: 'Q>W>E',
@@ -184,11 +185,14 @@ test('objets face aux adversaires et aux objets adverses', () => {
     )
   }
   const counters = buildItemCounters(state, dd, { minItemGames: 100, minPairGames: 40 })
-  assert.ok(counters['Guardian Angel'].Zed[1] > 0.02, JSON.stringify(counters['Guardian Angel']))
-  assert.ok(
-    counters['Maw of Malmortius']['#pctHp'][1] < -0.02,
-    JSON.stringify(counters['Maw of Malmortius'])
-  )
+  // Trop peu de paires pour mesurer la force du lissage : lissage maximal, les écarts publiés sont
+  // bien plus petits que les écarts bruts (+10 et −10 points) mais gardent leur sens.
+  const ga = counters['Guardian Angel'].Zed[1]
+  const maw = counters['Maw of Malmortius'].Zed[1]
+  assert.ok(ga >= 0.004 && ga < 0.03, JSON.stringify(counters['Guardian Angel']))
+  assert.ok(maw <= -0.004 && maw > -0.03, JSON.stringify(counters['Maw of Malmortius']))
+  // Écart trop faible une fois lissé (moins de 0,4 point) : non publié.
+  assert.ok(Math.abs(counters['Maw of Malmortius']['#pctHp']?.[1] ?? 0) < 0.01)
   // Reprise au patch suivant : compteurs réduits, rapports conservés.
   const seeded = seedFromPrevious(emptyState('16.22', 0), state, 0.25)
   assert.equal(seeded.itemAll['3026'][0], state.itemAll['3026'][0] * 0.25)
@@ -201,8 +205,8 @@ test('backtest : famille et objets recommandés', () => {
     core: ['Eclipse', 'Black Cleaver', "Death's Dance"],
     winRate: 0.5,
     variants: [
-      { key: 'Eclipse', winRate: 0.5, contexts: { ap: [200, 0.45] } },
-      { key: 'Sundered Sky', winRate: 0.5, contexts: { ap: [200, 0.56] } }
+      { key: 'Eclipse', games: 800, winRate: 0.5, contexts: { ap: [200, 0.45] } },
+      { key: 'Sundered Sky', games: 800, winRate: 0.5, contexts: { ap: [200, 0.56] } }
     ],
     situational: {
       all: {
@@ -240,6 +244,14 @@ test('backtest : famille et objets recommandés', () => {
     dd
   )
   assert.deepEqual(bt.variant, { followed: [1, 1], other: [1, 0] })
-  assert.deepEqual(bt.items, { high: [1, 1], low: [1, 0] })
+  // Chaque achat du 4e objet et des suivants est jugé à son rang : 2 achats conseillés (Ange
+  // gardien puis Gueule de Malmortius) dans la partie gagnée, 2 achats hors conseils dans l'autre.
+  assert.deepEqual(bt.items, { high: [2, 2], low: [2, 0] })
   assert.equal(bt.games, 2)
+  // Les objets déjà achetés ne sont plus proposés.
+  assert.deepEqual(recommendedItems(build, ['all'], ['Guardian Angel']), [
+    'Maw of Malmortius',
+    'Blade of the Ruined King',
+    'Mortal Reminder'
+  ])
 })

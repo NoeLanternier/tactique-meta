@@ -71,7 +71,9 @@ test('critères calculés comme dans l’app', () => {
       LeeSin: { games: 2000, winRate: 0.51, vs: { Viego: [100, 0.6] }, with: {}, against: {} },
       Viego: { games: 2000, winRate: 0.5, vs: {}, with: {}, against: {} }
     },
-    itemCounters: { 'Guardian Angel': { Zed: [500, 0.04], '#pctHp': [300, -0.02] } }
+    itemCounters: { 'Guardian Angel': { Zed: [500, 0.04], '#pctHp': [300, -0.02] } },
+    // Lissages faibles pour ce test (les vraies valeurs sont mesurées sur les données).
+    priors: { vs: 150, fam: 150, famCtx: 150, boots: 150, choiceCtx: 150 }
   }
   const rec = {
     champ: 'LeeSin',

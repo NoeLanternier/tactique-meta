@@ -1,5 +1,6 @@
 // Extraction des informations de build des deux junglers d'une partie classée.
 import { patchOf } from './ddragon.mjs'
+import { stateOfLead } from './priors.mjs'
 
 export const RANKED_SOLO = 420
 /** Balises (données gratuitement, pas un choix de départ). */
@@ -48,6 +49,24 @@ function purchases(events) {
     }
   }
   return bought
+}
+
+/**
+ * Écart d'or entre l'équipe `team` et l'équipe adverse à une minute donnée, en part de l'or
+ * adverse (0,1 = 10 % d'or en plus). Null sans chronologie.
+ */
+export function leadAt(timeline, teamOf, team, minute) {
+  const frames = timeline?.info?.frames ?? []
+  if (!frames.length) return null
+  const frame = frames[Math.max(0, Math.min(frames.length - 1, Math.floor(minute)))]
+  let mine = 0
+  let theirs = 0
+  for (const [pid, pf] of Object.entries(frame?.participantFrames ?? {})) {
+    const gold = Number(pf?.totalGold) || 0
+    if (teamOf.get(Number(pid)) === team) mine += gold
+    else theirs += gold
+  }
+  return theirs > 0 && mine > 0 ? (mine - theirs) / theirs : null
 }
 
 /**
@@ -231,6 +250,7 @@ export function extractJunglers(match, timeline, dd) {
 export function extractPlayers(match, timeline, dd, roles = ROLES) {
   const info = match.info
   const events = eventsByParticipant(timeline)
+  const teamOf = new Map(info.participants.map((x) => [Number(x.participantId), x.teamId]))
   const records = []
   const wanted = (x) => roles.includes(ROLE_OF_POSITION[x.teamPosition])
   for (const p of info.participants.filter(wanted)) {
@@ -288,6 +308,10 @@ export function extractPlayers(match, timeline, dd, roles = ROLES) {
       later: legendaries.slice(3, 6),
       items: legendaries.slice(0, 6),
       itemMin: legendaryMin.slice(0, 6),
+      // État de la partie à chaque achat : en avance ('a'), à égalité ('e'), en retard ('b').
+      itemState: legendaryMin
+        .slice(0, 6)
+        .map((min) => stateOfLead(leadAt(timeline, teamOf, p.teamId, min))),
       boots,
       pet,
       start: start.length ? start.join(',') : null,

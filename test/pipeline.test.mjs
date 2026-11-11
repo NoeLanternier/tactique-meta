@@ -307,5 +307,5 @@ test('contextes adverses : composition attendue (profils), pas l’issue de la p
   const up = upgradeState(old)
   assert.deepEqual(Object.keys(up.champs.LeeSin.ctxBase), ['all'])
   assert.equal(up.tuning.n, 0)
-  assert.equal(up.version, 6)
+  assert.equal(up.version, 7)
 })

@@ -10,6 +10,6 @@
   "scripts": {
     "start": "node src/run.mjs",
     "test-rapide": "node src/run.mjs --minutes 3 --regions euw1 --gold-regions euw1 --min-games 5 --out test-local",
-    "test": "node --test test/pipeline.test.mjs test/v4.test.mjs test/v5.test.mjs test/riot.test.mjs test/tuning.test.mjs test/quality.test.mjs test/e2e.test.mjs"
+    "test": "node --test test/pipeline.test.mjs test/v4.test.mjs test/v5.test.mjs test/riot.test.mjs test/tuning.test.mjs test/quality.test.mjs test/stats.test.mjs test/e2e.test.mjs"
   }
 }

@@ -247,7 +247,12 @@ async function main() {
           // les compte pas (les seuils sont faits pour les autres postes).
           if (rec.role !== 'support') recordQuality(quality, rec)
           // Backtest et réglage : avec la méta précédente, si ses contextes sont du même type.
-          if (slot.previous?.patch === dd.patch && slot.previous?.contexts === CONTEXT_KIND) {
+          // (méta d'avant les lissages mesurés : pas de comparaison, ses calculs diffèrent.)
+          if (
+            slot.previous?.patch === dd.patch &&
+            slot.previous?.contexts === CONTEXT_KIND &&
+            slot.previous?.priors
+          ) {
             const contexts = classifyContexts(slot.state, rec.enemy)
             evaluateRecord(slot.previous, contexts, rec, slot.state.backtest, dd)
             addTuning(slot.state.tuning, tuningFeatures(slot.previous, rec, contexts, dd), rec.win)
@@ -321,6 +326,7 @@ async function main() {
         `${L} ${slot.records} joueurs ajoutés, ${meta.sampleGames} sur le patch, ${meta.freshBuilds} builds à jour, ${meta.builds.length} au total (état : ${mb} Mo).`
       )
       if (json.length > 80e6) log(`${L} ATTENTION : état de ${mb} Mo, proche de la limite de 100 Mo de GitHub.`)
+      log(`${L} lissages mesurés (parties a priori) : ${JSON.stringify(meta.priors)}`)
       if (meta.backtest) log(`${L} backtest : ${JSON.stringify(meta.backtest)}`)
       if (meta.tuning) log(`${L} réglage du moteur : ${JSON.stringify(meta.tuning)}`)
       else log(`${L} réglage du moteur : ${Math.round(state.tuning.n)} parties (il en faut 2000)`)

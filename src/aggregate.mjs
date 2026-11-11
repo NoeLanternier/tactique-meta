@@ -5,10 +5,19 @@
 // une part minimale des parties du champion pour être retenue.
 import { emptyTuning, solveTuning } from './tuning.mjs'
 import { ARCHETYPES, guessArchetype } from './archetypes.mjs'
+import { bestOption, momPrior, posterior } from './stats.mjs'
+import {
+  DEFAULT_PRIORS,
+  STATES,
+  championItemLift,
+  measurePriors,
+  pooledItemLifts
+} from './priors.mjs'
 
-export const STATE_VERSION = 6
+export const STATE_VERSION = 7
 /** Contextes adverses pour lesquels on mesure la performance des objets. */
 export const CONTEXTS = ['all', 'ap', 'ad', 'heal', 'tank', 'cc']
+
 const CONTEXT_METRICS = ['heal', 'tank', 'cc']
 /** Un contexte « fort » = au-dessus de ~75 % des parties (z-score > 0,67). */
 const HIGH_Z = 0.67
@@ -33,9 +42,14 @@ export function emptyState(patch, patchStart) {
   }
 }
 
-/** Compteurs du backtest : parties où le joueur a suivi (ou non) nos recommandations. */
+/**
+ * Compteurs du backtest. Famille : parties où le joueur a commencé (ou non) par la famille
+ * conseillée. Objets : achats du 4e au 6e objet qui font partie (high) ou non (low) des objets
+ * conseillés, comparés au même rang (v : 2).
+ */
 export function emptyBacktest() {
   return {
+    v: 2,
     games: 0,
     variant: { followed: [0, 0], other: [0, 0] },
     items: { high: [0, 0], low: [0, 0] }
@@ -67,9 +81,22 @@ function dropOldContexts(state) {
   state.tuning = emptyTuning()
 }
 
+/**
+ * Version 7 : lissage mesuré sur les données, objets comparés au même rang et dans le même état de
+ * la partie (compteurs `sl`). Les anciens compteurs par rang et par contexte (`ctxSlots`), dont les
+ * écarts n'étaient que du hasard, sont retirés ; le backtest et le réglage du moteur repartent de
+ * zéro (leurs calculs ont changé).
+ */
+function toVersion7(state) {
+  for (const c of Object.values(state.champs ?? {})) delete c.ctxSlots
+  state.backtest = emptyBacktest()
+  state.tuning = emptyTuning()
+}
+
 /** Ajoute les champs des nouvelles versions à un état plus ancien. */
 export function upgradeState(state) {
   if ((state.version ?? 0) < 6) dropOldContexts(state)
+  if ((state.version ?? 0) < 7) toVersion7(state)
   state.profiles ??= {}
   state.ctxStats ??= {}
   state.itemAll ??= {}
@@ -111,7 +138,8 @@ function champState(state, champ) {
   const c = (state.champs[champ] ??= { g: 0, w: 0 })
   for (const k of CHAMP_MAPS) c[k] ??= {}
   c.ctxItems ??= {}
-  c.ctxSlots ??= {}
+  // Objets par état de la partie à l'achat, puis par rang : { a|e|b: { rang: { objet: [g, w] } } }.
+  c.sl ??= {}
   c.itemMin ??= {}
   c.fam ??= {}
   c.bench ??= {}
@@ -238,10 +266,14 @@ export function addRecord(state, rec) {
     inc(c.ctxBase, ctx, rec.win)
     const present = (c.ctxItems[ctx] ??= {})
     for (const id of items) inc(present, String(id), rec.win)
-    // Objet au k-ième rang : comparé ensuite aux autres objets achetés au même rang.
-    const slots = (c.ctxSlots[ctx] ??= {})
-    items.forEach((id, k) => inc((slots[k] ??= {}), String(id), rec.win))
   }
+  // Objet au k-ième rang, selon l'état de la partie à l'achat : comparé ensuite aux autres objets
+  // achetés au même rang et dans le même état.
+  items.forEach((id, k) => {
+    const st = rec.itemState?.[k]
+    if (!STATES.includes(st)) return
+    inc(((c.sl[st] ??= {})[k] ??= {}), String(id), rec.win)
+  })
   // Runes, bottes, familier et compétences selon le contexte adverse ; familier selon le jungler adverse.
   const choice = {
     runes: rec.runeSig,
@@ -363,25 +395,15 @@ export function seedFromPrevious(state, previous, factor = 0.25) {
   return state
 }
 
-const bayes = (g, w, prior, k = 30) => (w + k * prior) / (g + k)
 const round3 = (x) => Math.round(x * 1000) / 1000
 
 /**
- * Meilleure option : parmi celles jouées dans au moins `minShare` des cas, celle au meilleur taux
- * de victoire lissé. À défaut, la plus jouée.
+ * Meilleure option d'un compteur : celle dont le taux de victoire estimé est le meilleur, parmi
+ * celles jouées dans au moins `minShare` des cas (lissage de force `k`, voir stats.mjs). À défaut,
+ * la plus jouée.
  */
-export function pickBest(map, prior, { minShare = 0.1, minGames = 5, filter = () => true } = {}) {
-  const entries = Object.entries(map).filter(([k]) => filter(k))
-  const total = entries.reduce((s, [, [g]]) => s + g, 0)
-  if (total === 0) return null
-  const eligible = entries.filter(([, [g]]) => g >= minGames && g / total >= minShare)
-  const pool = eligible.length ? eligible : entries
-  pool.sort((a, b) =>
-    eligible.length
-      ? bayes(b[1][0], b[1][1], prior) - bayes(a[1][0], a[1][1], prior)
-      : b[1][0] - a[1][0]
-  )
-  return pool[0][0]
+export function pickBest(map, _prior, { minShare = 0.1, minGames = 5, filter, k, slope } = {}) {
+  return bestOption(map, { minShare, minGames, filter, k: k ?? 2000, slope: slope ?? 0 })
 }
 
 const OFFENSE = { 5008: 'AF', 5005: 'AS', 5007: 'AH' }
@@ -406,90 +428,160 @@ export function runesFromSig(sig, dd) {
   }
 }
 
-/**
- * Effet d'un objet sur la victoire, comparé aux autres objets achetés AU MÊME RANG (1er, 2e…
- * 6e objet légendaire). Comparer « avec / sans l'objet » avantagerait les objets tardifs : seuls
- * les joueurs qui ont beaucoup d'or les terminent, et ceux-là gagnent plus souvent.
- */
-function slotLift(slots, id, prior) {
-  if (!slots) return null
-  let weight = 0
-  let sum = 0
-  for (const byItem of Object.values(slots)) {
-    const cell = byItem[id]
-    if (!cell) continue
-    let g = 0
-    let w = 0
-    for (const [gg, ww] of Object.values(byItem)) {
-      g += gg
-      w += ww
-    }
-    if (g <= 0) continue
-    const slotRate = bayes(g, w, prior, 20)
-    sum += cell[0] * (bayes(cell[0], cell[1], slotRate, 20) - slotRate)
-    weight += cell[0]
-  }
-  return weight >= 10 ? { lift: sum / weight, games: weight } : null
-}
+/** Clé de voûte d'une signature de page de runes. */
+export const keystoneOf = (sig) => String(sig).split('|')[1]?.split(',')[0] ?? ''
 
-/**
- * Objets qui gagnent le plus dans chaque contexte adverse : part des parties où l'objet est
- * construit, gain de taux de victoire par rapport aux autres choix au même rang, et minute
- * moyenne d'achat.
- */
-export function situationalStats(c, dd) {
+/** Compteur { clé de voûte: [parties, victoires] } à partir des pages de runes. */
+export function keystoneTotals(runes, valid = () => true) {
   const out = {}
-  for (const ctx of CONTEXTS) {
-    const base = c.ctxBase?.[ctx]
-    const items = c.ctxItems?.[ctx]
-    if (!base || !items || base[0] < 20) continue
-    const prior = base[1] / base[0]
-    const list = Object.entries(items)
-      .map(([id, [g, w]]) => {
-        const it = dd.items.get(Number(id))
-        if (!it?.isLegendary || g < 5) return null
-        const share = g / base[0]
-        if (share < 0.04) return null
-        // Rang par rang si possible ; sinon (anciennes données) avec / sans l'objet.
-        const bySlot = slotLift(c.ctxSlots?.[ctx], id, prior)
-        const lift =
-          bySlot?.lift ?? bayes(g, w, prior, 20) - bayes(base[0] - g, base[1] - w, prior, 20)
-        const minute = c.itemMin?.[id]
-        const entry = {
-          item: it.name,
-          share: round3(share),
-          lift: round3(lift),
-          games: Math.round(g)
-        }
-        if (minute && minute[0] >= 5) entry.minute = Math.round((minute[1] / minute[0]) * 10) / 10
-        return entry
-      })
-      .filter(Boolean)
-      .sort((a, b) => b.share - a.share)
-      .slice(0, 12)
-    if (list.length) out[ctx] = { games: Math.round(base[0]), items: list }
+  for (const [sig, [g, w]] of Object.entries(runes ?? {})) {
+    if (!valid(sig)) continue
+    const cell = (out[keystoneOf(sig)] ??= [0, 0])
+    cell[0] += g
+    cell[1] += w
   }
   return out
 }
 
-/** Calcule le build d'un champion, ou null si trop peu de parties. */
-export function selectBuild(champ, c, dd, { minGames = 40 } = {}) {
+/** Parties fictives qui ramènent la part d'un objet dans un contexte vers sa part habituelle. */
+const SHARE_PRIOR = 40
+
+/**
+ * Objets d'un champion après le cœur, pour chaque contexte :
+ * - `all` : part des parties où l'objet est construit, et écart de taux de victoire par rapport
+ *   aux autres objets achetés au même rang et dans le même état de la partie (lissé, voir
+ *   priors.mjs) ;
+ * - `ap`, `ad`, `heal`, `tank`, `cc` : part de l'objet face à ce type d'équipe. C'est le signal
+ *   fiable d'un contexte : ce que les joueurs construisent davantage dans ces parties. L'écart de
+ *   taux de victoire par contexte n'est pas mesurable avec ce volume de parties : celui de `all`
+ *   est repris ;
+ * - `ahead`, `behind` : part et écart de l'objet quand il est acheté avec de l'avance ou du retard.
+ */
+export function situationalStats(c, dd, { priors = DEFAULT_PRIORS, pooled = {} } = {}) {
+  const out = {}
+  const base = c.ctxBase?.all
+  const items = c.ctxItems?.all
+  if (!base || !items || base[0] < 20) return out
+  const kSlot = priors.slot ?? DEFAULT_PRIORS.slot
+  const list = Object.entries(items)
+    .map(([id, [g]]) => {
+      const it = dd.items.get(Number(id))
+      if (!it?.isLegendary || g < 5 || g / base[0] < 0.03) return null
+      const [, lift] = championItemLift(c, id, pooled, kSlot)
+      return { id, name: it.name, games: g, share: g / base[0], lift }
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.share - a.share)
+    .slice(0, 14)
+  if (!list.length) return out
+  out.all = {
+    games: Math.round(base[0]),
+    items: list.map((x) => {
+      const entry = {
+        item: x.name,
+        share: round3(x.share),
+        lift: round3(x.lift),
+        games: Math.round(x.games)
+      }
+      const minute = c.itemMin?.[x.id]
+      if (minute && minute[0] >= 5) entry.minute = Math.round((minute[1] / minute[0]) * 10) / 10
+      return entry
+    })
+  }
+  for (const ctx of CONTEXTS) {
+    if (ctx === 'all') continue
+    const n = c.ctxBase?.[ctx]?.[0] ?? 0
+    if (n < 30) continue
+    out[ctx] = {
+      games: Math.round(n),
+      items: list.map((x) => {
+        const g = c.ctxItems?.[ctx]?.[x.id]?.[0] ?? 0
+        return {
+          item: x.name,
+          share: round3((g + SHARE_PRIOR * x.share) / (n + SHARE_PRIOR)),
+          lift: round3(x.lift),
+          games: Math.round(g)
+        }
+      })
+    }
+  }
+  // Achats tardifs (à partir du 3e objet) selon l'état de la partie.
+  const late = (st, id) => {
+    let n = 0
+    for (const [k, byItem] of Object.entries(c.sl?.[st] ?? {})) {
+      if (Number(k) < 2) continue
+      if (id === undefined) for (const [g] of Object.values(byItem)) n += g
+      else n += byItem[id]?.[0] ?? 0
+    }
+    return n
+  }
+  const total = STATES.reduce((t, st) => t + late(st), 0)
+  for (const [key, st] of [
+    ['ahead', 'a'],
+    ['behind', 'b']
+  ]) {
+    const n = late(st)
+    if (n < 40 || total <= 0) continue
+    out[key] = {
+      games: Math.round(n),
+      items: list.map((x) => {
+        const usual = STATES.reduce((t, s) => t + late(s, x.id), 0) / total
+        const g = late(st, x.id)
+        const here = (g + SHARE_PRIOR * usual) / (n + SHARE_PRIOR)
+        // Écart propre à cet état, lissé deux fois plus fort (moins de parties par état).
+        const [ns, raw] = championItemLift(c, x.id, {}, 0, [st])
+        const [na, rawAll] = championItemLift(c, x.id, {}, 0)
+        const own = ns > 0 && na > 0 ? posterior(ns, raw - rawAll, 2 * kSlot) : 0
+        return {
+          item: x.name,
+          share: round3(usual > 0 ? Math.min(1, (x.share * here) / usual) : x.share),
+          lift: round3(x.lift + own),
+          games: Math.round(g)
+        }
+      })
+    }
+  }
+  return out
+}
+
+/**
+ * Calcule le build d'un champion, ou null si trop peu de parties. Chaque choix (page de runes,
+ * objets du cœur, bottes, familier, compétences, départ) est celui dont le taux de victoire estimé
+ * est le meilleur, avec un lissage mesuré sur les données (`priors`) : une option peu jouée ne
+ * passe devant l'option habituelle que si son avantage est établi.
+ */
+export function selectBuild(champ, c, dd, { minGames = 40, priors = DEFAULT_PRIORS, pooled } = {}) {
   if (!c || c.g < minGames) return null
   const prior = c.w / c.g
   const itemName = (id) => dd.items.get(Number(id))?.name ?? null
+  const P = { ...DEFAULT_PRIORS, ...priors }
+  const itemSlope = priors?.slope?.item ?? 0
 
-  // Runes : page complète la plus performante parmi les pages courantes (validée contre Data Dragon).
+  // Runes : d'abord la clé de voûte (toutes ses pages réunies : c'est le choix qui compte le plus
+  // et celui que les données mesurent le mieux), puis la meilleure page complète de cette clé
+  // (validée contre Data Dragon).
   const validSig = (sig) => runesFromSig(sig, dd) !== null
-  const sig = pickBest(c.runes, prior, { minShare: 0.08, filter: validSig })
+  const keystone = bestOption(keystoneTotals(c.runes, validSig), { k: P.keystone })
+  const sig = bestOption(c.runes, {
+    minShare: 0.1,
+    filter: (s) => validSig(s) && keystoneOf(s) === keystone,
+    k: P.runes
+  })
   const runes = sig ? runesFromSig(sig, dd) : null
   if (!runes) return null
 
-  // Cœur : choix glouton conditionnel (1er objet, puis 2e sachant le 1er, puis 3e).
-  const c1 = pickBest(c.c1, prior)
+  // Cœur : choix conditionnel (1er objet, puis 2e sachant le 1er, puis 3e).
+  const c1 = bestOption(c.c1, { k: P.c1, slope: itemSlope })
   if (!c1) return null
-  const c2key = pickBest(c.c2, prior, { filter: (k) => k.startsWith(`${c1}>`) })
+  const c2key = bestOption(c.c2, {
+    k: P.c2,
+    slope: itemSlope,
+    filter: (k) => k.startsWith(`${c1}>`)
+  })
   const c2 = c2key ? c2key.split('>')[1] : null
-  const c3key = c2 ? pickBest(c.c3, prior, { filter: (k) => k.startsWith(`${c1}>${c2}>`) }) : null
+  const c3key = c2
+    ? bestOption(c.c3, { k: P.c3, slope: itemSlope, filter: (k) => k.startsWith(`${c1}>${c2}>`) })
+    : null
   const c3 = c3key ? c3key.split('>')[2] : null
   const core = [c1, c2, c3].filter(Boolean)
   if (core.length < 3) return null
@@ -502,11 +594,15 @@ export function selectBuild(champ, c, dd, { minGames = 40 } = {}) {
     .map(([id]) => itemName(id))
     .filter(Boolean)
 
-  const boots = pickBest(c.boots, prior)
-  const pet = pickBest(c.pet, prior, { minShare: 0.15 })
-  const skills = pickBest(c.skills, prior, { minShare: 0.15 }) ?? ''
-  // Départ le plus courant parmi les bons (le choix du départ dépend surtout de l'habitude).
-  const startSig = pickBest(c.start ?? {}, prior, { minShare: 0.2 })
+  const boots = bestOption(c.boots, { k: P.boots })
+  const pet = bestOption(c.pet, { minShare: 0.15, k: P.pet })
+  const skills =
+    bestOption(c.skills, { minShare: 0.15, k: P.skills, slope: priors?.slope?.skills ?? 0 }) ?? ''
+  const startSig = bestOption(c.start ?? {}, {
+    minShare: 0.2,
+    k: P.start,
+    slope: priors?.slope?.start ?? 0
+  })
   const start = startSig
     ? startSig.split(',').map((id) => itemName(id)).filter(Boolean)
     : []
@@ -521,7 +617,7 @@ export function selectBuild(champ, c, dd, { minGames = 40 } = {}) {
       items: sigKey.split(',').map((id) => itemName(id)).filter(Boolean),
       games: Math.round(g),
       share: round3(g / startTotal),
-      winRate: round3(bayes(g, w, prior, 30))
+      winRate: round3(prior + posterior(g, w / g - prior, P.start))
     }))
     .filter((o) => o.items.length)
   const coreItems = core.map((id) => dd.items.get(Number(id)))
@@ -537,7 +633,7 @@ export function selectBuild(champ, c, dd, { minGames = 40 } = {}) {
     ...(start.length ? { start } : {}),
     ...(startOptions.length ? { startOptions } : {}),
     runes,
-    situational: situationalStats(c, dd),
+    situational: situationalStats(c, dd, { priors: P, pooled }),
     patch: dd.patch,
     games: Math.round(c.g),
     winRate: round3(prior)
@@ -765,13 +861,13 @@ export function buildChoices(c, dd) {
  * parties : chacune avec son cœur, ses runes, ses options et son taux de victoire par contexte.
  * Rien si une seule famille ressort.
  */
-export function buildVariants(champ, c, dd, { minGames = 40 } = {}) {
+export function buildVariants(champ, c, dd, { minGames = 40, priors } = {}) {
   const variants = []
   const fams = Object.entries(c.fam ?? {}).sort((a, b) => b[1].g - a[1].g)
   for (const [first, f] of fams) {
     if (f.g < Math.max(30, minGames * 0.6) || f.g / c.g < 0.12) continue
-    const pseudo = { ...f, c1: { [first]: [f.g, f.w] }, ctxItems: {}, ctxSlots: {} }
-    const b = selectBuild(champ, pseudo, dd, { minGames: 0 })
+    const pseudo = { ...f, c1: { [first]: [f.g, f.w] }, ctxItems: {}, sl: {} }
+    const b = selectBuild(champ, pseudo, dd, { minGames: 0, priors })
     if (!b) continue
     const contexts = {}
     for (const [ctx, [g, w]] of Object.entries(f.ctxBase ?? {}))
@@ -801,9 +897,11 @@ export function buildVariants(champ, c, dd, { minGames = 40 } = {}) {
 }
 
 /**
- * Objets face aux adversaires (tous junglers confondus) : écart de taux de victoire d'un objet
- * quand tel champion (ou tel type d'objet adverse, ex. '#pctHp') est en face, moins l'écart que ce
- * même adversaire provoque pour tout le monde. Ne garde que les effets nets.
+ * Effet d'un objet face à un adversaire précis ou à un type d'objets adverses ('#antiheal'…), tous
+ * champions du poste confondus : écart de taux de victoire de l'objet dans ces parties, une fois
+ * retirés l'effet habituel de l'objet et celui de l'adversaire. Les écarts sont lissés selon ce que
+ * les données permettent de mesurer (voir stats.mjs) et publiés tels quels : l'app les additionne
+ * sans autre correction. Seuls les écarts d'au moins 0,4 point sont gardés.
  */
 export function buildItemCounters(state, dd, { minItemGames = 200, minPairGames = 40 } = {}) {
   let G = 0
@@ -814,23 +912,47 @@ export function buildItemCounters(state, dd, { minItemGames = 200, minPairGames 
   }
   if (G <= 0) return {}
   const overall = W / G
-  const out = {}
+  const rows = []
   for (const [id, [g, w]] of Object.entries(state.itemAll ?? {})) {
     const it = dd.items.get(Number(id))
     if (!it?.isLegendary || g < minItemGames) continue
     const base = w / g
-    const rows = []
     for (const [foe, [pg, pw]] of Object.entries(state.itemFoe?.[id] ?? {})) {
       if (pg < minPairGames) continue
       const fa = state.foeAll?.[foe]
-      if (!fa || fa[0] < minPairGames) continue
-      const foeShift = bayes(fa[0], fa[1], overall, 50) - overall
-      const lift = bayes(pg, pw, base, 50) - base - foeShift
-      if (Math.abs(lift) >= 0.015) rows.push([foe, Math.round(pg), round3(lift)])
+      if (!fa || fa[0] < 200) continue
+      const dev = pw / pg - base - (fa[1] / fa[0] - overall)
+      rows.push({ item: it.name, foe, n: pg, dev, v: (base * (1 - base)) / pg })
     }
-    rows.sort((a, b) => Math.abs(b[2]) * Math.sqrt(b[1]) - Math.abs(a[2]) * Math.sqrt(a[1]))
-    if (rows.length)
-      out[it.name] = Object.fromEntries(rows.slice(0, 15).map(([f, pg, l]) => [f, [pg, l]]))
+  }
+  const kOf = (trait) =>
+    momPrior(
+      rows.filter((r) => r.foe.startsWith('#') === trait).map((r) => [r.n, r.dev, r.v]),
+      { fallback: DEFAULT_PRIORS.counter, minCells: 200, minGames: 50000 }
+    ).k
+  const k = { champ: kOf(false), trait: kOf(true) }
+  const out = {}
+  for (const r of rows) {
+    const lift = posterior(r.n, r.dev, r.foe.startsWith('#') ? k.trait : k.champ)
+    if (Math.abs(lift) < 0.004) continue
+    ;(out[r.item] ??= {})[r.foe] = [Math.round(r.n), round3(lift)]
+  }
+  return out
+}
+
+/**
+ * Tous les champions vus dans l'équipe adverse, quel que soit leur poste : [parties, taux de
+ * victoire de leur équipe, part des parties où ils sont bannis]. Sert aux bans (un champion fort à
+ * un autre poste mérite aussi un ban).
+ */
+export function buildThreats(state, minGames = 100) {
+  const out = {}
+  const bans = state.bans
+  for (const [foe, [g, w]] of Object.entries(state.foeAll ?? {})) {
+    if (foe.startsWith('#') || g < minGames) continue
+    out[foe] = [Math.round(g), round3(1 - w / g)]
+    // Part des parties où le champion est banni (les bans valent pour tous les postes).
+    if (bans?.games >= 100) out[foe].push(round3((bans.champs[foe] ?? 0) / bans.games))
   }
   return out
 }
@@ -842,6 +964,7 @@ export function backtestSummary(bt) {
   if (!bt || bt.games === 0) return null
   const cell = (x) => ({ games: Math.round(x[0]), winRate: rateOf(x) })
   return {
+    v: 2,
     games: bt.games,
     variant: { followed: cell(bt.variant.followed), other: cell(bt.variant.other) },
     items: { high: cell(bt.items.high), low: cell(bt.items.low) }
@@ -855,10 +978,15 @@ export function backtestSummary(bt) {
  */
 export function buildMeta(state, dd, previousMeta, options = {}) {
   const builds = []
+  // Force de lissage de chaque famille de statistiques, mesurée sur les parties du patch, et
+  // effets d'objets regroupés entre champions.
+  const priors = measurePriors(state)
+  const pooled = pooledItemLifts(state)
+  const opts = { ...options, priors, pooled }
   for (const [champ, c] of Object.entries(state.champs)) {
-    const b = selectBuild(champ, c, dd, options)
+    const b = selectBuild(champ, c, dd, opts)
     if (!b) continue
-    const variants = buildVariants(champ, c, dd, options)
+    const variants = buildVariants(champ, c, dd, opts)
     if (variants.length) b.variants = variants
     const choices = buildChoices(c, dd)
     if (Object.keys(choices).length) b.choices = choices
@@ -885,10 +1013,14 @@ export function buildMeta(state, dd, previousMeta, options = {}) {
     // Si trop peu de parties (début de patch), on garde les profils précédents.
     profiles: Object.keys(profiles).length >= 50 ? profiles : (previousMeta?.profiles ?? profiles),
     junglers: buildJunglerStats(state),
+    // Lissages mesurés : l'app estime chaque écart avec n / (n + k) (voir stats.mjs).
+    priors,
+    threats: buildThreats(state),
     itemCounters: buildItemCounters(state, dd),
     backtest: backtestSummary(state.backtest),
     // Réglage automatique des poids du moteur de l'app (voir tuning.mjs).
-    tuning: solveTuning(state.tuning) ?? previousMeta?.tuning ?? null,
+    tuning:
+      solveTuning(state.tuning) ?? (previousMeta?.tuning?.v === 2 ? previousMeta.tuning : null),
     // Début de patch : on garde les repères précédents tant qu'il n'y a pas assez de parties.
     benchmarks: (() => {
       const b = buildBenchmarks(state)

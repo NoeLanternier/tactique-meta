@@ -37,8 +37,11 @@ soigne et encaisse davantage : les valeurs observées liaient le contexte à l'i
 2. Lit leurs parties classées solo du patch en cours (les remakes et parties < 15 min sont ignorés).
 3. Pour chaque joueur (tous les postes) : page de runes complète, ordre réel d'achat (timeline), bottes, familier (jungle),
    ordre de montée des compétences, victoire ou défaite.
-4. Choisit pour chaque champion les options au **meilleur taux de victoire lissé** parmi celles
-   jouées dans au moins 8 à 15 % des parties (une option rare ne peut pas gagner par chance).
+4. Choisit pour chaque champion les options au **meilleur taux de victoire estimé** parmi celles
+   jouées dans au moins 8 à 15 % des parties. Le lissage est **mesuré sur les données** (voir
+   « Lissage mesuré » plus bas) : une option peu jouée ne passe devant l'option habituelle que si
+   son avantage est établi. Pour les runes, la clé de voûte est choisie d'abord (toutes ses pages
+   réunies), puis la meilleure page de cette clé.
 5. Mesure le vrai profil de chaque champion, tous postes confondus (part de dégâts magiques,
    résistance, contrôles, soins, boucliers), et la performance des objets selon le contexte adverse
    (équipe très AP, très AD, beaucoup de soins, très résistante, beaucoup de contrôles).
@@ -47,17 +50,25 @@ soigne et encaisse davantage : les valeurs observées liaient le contexte à l'i
    AD, soins, résistante, contrôles), et son taux de bannissement (conseils de pick et de ban dans
    l'app, qui ne tiennent compte que des champions déjà choisis pendant la draft).
 7. Mesure l'effet de chaque objet **par rapport aux autres objets achetés au même rang** (4e, 5e…
-   objet) et sa minute moyenne d'achat : sans cela, les objets tardifs paraîtraient « gagnants »
-   simplement parce que seuls les joueurs en avance les terminent.
+   objet) **et dans le même état de la partie** (équipe en avance, à égalité ou en retard d'au
+   moins 5 % d'or au moment de l'achat), et sa minute moyenne d'achat. Sans cela, les objets
+   tardifs ou « de luxe » paraîtraient gagnants simplement parce qu'on les achète quand on gagne
+   déjà, et les objets défensifs ou anti-soins perdants parce qu'on les achète quand ça va mal.
+   La **part** de chaque objet face à chaque type d'équipe, et quand on est en avance ou en
+   retard, est publiée aussi : c'est le signal le plus fiable de ce que les joueurs adaptent.
 8. Repère les **familles de build** de chaque champion (même premier objet, au moins 12 % des
    parties) avec leur cœur, leurs runes et leur taux de victoire par contexte adverse : l'app
    choisit la famille adaptée à la partie, puis suit celle qui a été commencée.
-9. Mesure, tous junglers confondus, chaque objet **face à chaque champion adverse et face aux
-   objets adverses** (anti-soins, dégâts en % des PV, boucliers, stase / anti-sorts, pénétration,
-   armure, RM, vol de vie), en retirant l'effet que cet adversaire a sur tout le monde.
-10. **Backtest** : chaque nouvelle partie est comparée à la méta de la veille avant d'être ajoutée
-    (famille recommandée suivie ou non, objets situationnels recommandés achetés ou non). Le taux
-    de victoire des deux groupes est publié dans `meta.json` (`backtest`) et dans le journal.
+9. Mesure, tous champions du poste confondus, chaque objet **face à chaque champion adverse et
+   face aux objets adverses** (anti-soins, dégâts en % des PV, boucliers, stase / anti-sorts,
+   pénétration, armure, RM, vol de vie), en retirant l'effet que cet adversaire a sur tout le
+   monde. Ces écarts sont publiés déjà lissés, et seulement s'ils dépassent 0,4 point. Publie
+   aussi tous les champions vus dans l'équipe adverse, quel que soit leur poste (`threats` :
+   parties, taux de victoire de leur équipe, taux de ban), pour les conseils de ban.
+10. **Backtest** : chaque nouvelle partie est comparée à la méta précédente avant d'être ajoutée
+    (famille recommandée suivie ou non ; chaque achat du 4e au 6e objet parmi les objets
+    conseillés à ce moment, ou non, comparés au même rang). Le taux de victoire des deux groupes
+    est publié dans `meta.json` (`backtest`) et dans le journal.
 11. Mesure par contexte adverse les **options courantes** de chaque champion (pages de runes, aussi
     par famille de build ; bottes ; familier, aussi selon le jungler adverse ; ordre des
     compétences) : l'app garde le choix du build sauf si une autre option gagne nettement plus.
@@ -82,6 +93,39 @@ Les compteurs du patch sont conservés dans `state/` (`state/gold/` pour la mét
 les données s'affinent donc de jour en jour jusqu'au patch suivant. Au changement de patch, les
 données du patch précédent sont reprises avec un poids de 25 % pour des builds stables dès le
 premier jour.
+
+## Lissage mesuré
+
+Un taux de victoire observé sur n parties s'écarte du vrai taux d'environ 50 / √n points : ±5
+points sur 100 parties. Or les vrais écarts entre deux options (pages de runes, objets,
+affrontements…) sont de l'ordre de **1 point**. Choisir « le meilleur taux observé » revient donc
+souvent à choisir l'option la plus chanceuse.
+
+Pour chaque famille de statistiques, la collecte mesure donc sur ses propres données la taille des
+vrais écarts (variance observée − variance due au hasard), ce qui donne un nombre de parties
+« a priori » k. Un écart observé sur n parties est ensuite retenu pour n / (n + k) de sa valeur.
+Ces forces sont publiées dans `meta.json` (`priors`) et l'app applique le même calcul
+(`src/stats.mjs`, `src/priors.mjs`). Mesures de novembre 2026 (patch 16.22) :
+
+| Statistique | Vrai écart (écart-type) | k |
+| --- | --- | --- |
+| Force d'un champion à son poste | ≈ 1,5 point | ≈ 1 000 |
+| Affrontement direct (voie) | 1,3 à 2,3 points (0 en jungle) | 500 à 1 500 |
+| Synergie avec un allié / contre un adversaire hors voie | non mesurable | maximum |
+| Champion selon la composition adverse | 0 à 2 points | 600 à maximum |
+| Famille de build, clé de voûte | 0,4 à 1 point | 2 500 à 15 000 |
+| Page de runes, bottes, compétences, départ | 0,5 à 1,8 point | 700 à 6 500 |
+| Objet comparé aux autres au même rang | ≈ 1,6 point | ≈ 1 000 |
+| Runes / bottes / objets selon la composition adverse | non mesurable à ce volume | maximum |
+| Objet face à un champion adverse précis | non mesurable à ce volume | maximum |
+
+« Non mesurable » ne veut pas dire que l'effet n'existe pas en jeu, mais qu'il est trop petit pour
+être distingué du hasard avec ce nombre de parties : il ne pèse alors presque rien, et pèsera
+davantage de lui-même quand il y aura plus de parties (clé de production).
+
+Validation hors échantillon (parties du 10 et 11 novembre prédites avec la méta du 9) : avec
+l'ancien lissage fixe, l'effet prédit d'un affrontement direct était 4 à 20 fois trop fort, et la
+prédiction était moins bonne que de ne rien prédire ; avec le lissage mesuré, elle est calibrée.
 
 ## Commandes
 

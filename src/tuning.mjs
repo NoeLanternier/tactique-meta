@@ -16,6 +16,7 @@
 // adverses viennent de ce qui a été observé dans la partie (l'app les estime pendant la draft).
 
 import { runesFromSig } from './aggregate.mjs'
+import { DEFAULT_PRIORS } from './priors.mjs'
 
 export const TUNING_KEYS = [
   'pick', // force du champion (taux de victoire du patch)
@@ -30,8 +31,9 @@ export const TUNING_KEYS = [
 const P = TUNING_KEYS.length + 1 // + constante
 
 const CONTEXT_KEYS = ['ap', 'ad', 'heal', 'tank', 'cc']
-const PAIR_K = 40
 const PAIR_CAP = 0.25
+/** Version des critères : 2 = écarts lissés avec les forces mesurées (meta.priors). */
+export const TUNING_VERSION = 2
 /** Écart-type a priori des coefficients autour de 1 (rapprochement selon l'incertitude). */
 const PRIOR_SD = 0.5
 export const MIN_TUNING_GAMES = 2000
@@ -43,6 +45,7 @@ const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x))
 
 export function emptyTuning() {
   return {
+    v: TUNING_VERSION,
     n: 0,
     sy: 0,
     A: Array.from({ length: P }, () => new Array(P).fill(0)),
@@ -51,28 +54,28 @@ export function emptyTuning() {
 }
 
 /** Écart de contexte d'une option : moyenne sur les contextes de la partie (comme l'app). */
-function contextShift(cells, base, contexts) {
+function contextShift(cells, base, contexts, k) {
   let sum = 0
   let n = 0
   for (const ctx of contexts) {
     if (!CONTEXT_KEYS.includes(ctx)) continue
     const cell = cells?.[ctx]
     if (!cell) continue
-    sum += smooth(cell[0], cell[1], base, 30) - base
+    sum += smooth(cell[0], cell[1], base, k) - base
     n++
   }
   return sum / Math.max(1, n)
 }
 
 /** Effet « général » d'un allié ou adversaire, commun à tous les junglers (retiré dans l'app). */
-function generalEffects(meta, prior) {
+function generalEffects(meta, prior, pairK) {
   const out = { with: new Map(), against: new Map() }
   for (const side of ['with', 'against']) {
     const acc = new Map()
     for (const j of Object.values(meta.junglers ?? {})) {
       const base = smooth(j.games, j.winRate, prior.mean, prior.k)
       for (const [champ, pair] of Object.entries(j[side] ?? {})) {
-        const d = logit(smooth(pair[0], pair[1], base, PAIR_K)) - logit(base)
+        const d = logit(smooth(pair[0], pair[1], base, pairK)) - logit(base)
         const a = acc.get(champ) ?? [0, 0]
         a[0] += pair[0]
         a[1] += pair[0] * d
@@ -104,10 +107,12 @@ function prepared(meta) {
   let p = cache.get(meta)
   if (!p) {
     const prior = shrinkPrior(meta.junglers)
+    const priors = { ...DEFAULT_PRIORS, ...(meta.priors ?? {}) }
     p = {
       builds: new Map((meta.builds ?? []).map((b) => [b.id, b])),
       prior,
-      general: generalEffects(meta, prior)
+      priors,
+      general: generalEffects(meta, prior, priors.pair)
     }
     cache.set(meta, p)
   }
@@ -119,7 +124,7 @@ function prepared(meta) {
  * `meta` (méta de la veille). `contexts` : contextes adverses de la partie ('all', 'ap'…).
  */
 export function tuningFeatures(meta, rec, contexts, dd) {
-  const { builds, general, prior: shrink } = prepared(meta)
+  const { builds, general, prior: shrink, priors: P } = prepared(meta)
   const f = Object.fromEntries(TUNING_KEYS.map((k) => [k, 0]))
   const itemName = (id) => (id === null || id === undefined ? null : dd.items.get(Number(id))?.name)
 
@@ -129,12 +134,12 @@ export function tuningFeatures(meta, rec, contexts, dd) {
     const base = smooth(s.games, s.winRate, shrink.mean, shrink.k)
     f.pick = base - shrink.mean
     const vs = rec.enemyJungler ? s.vs?.[rec.enemyJungler] : null
-    if (vs) f.vs = smooth(vs[0], vs[1], base, 25) - base
+    if (vs) f.vs = smooth(vs[0], vs[1], base, P.vs) - base
     let sum = 0
     const pair = (side, champ) => {
       const cell = s[side]?.[champ]
       if (!cell) return
-      sum += logit(smooth(cell[0], cell[1], base, PAIR_K)) - logit(base) - (general[side].get(champ) ?? 0)
+      sum += logit(smooth(cell[0], cell[1], base, P.pair)) - logit(base) - (general[side].get(champ) ?? 0)
     }
     for (const a of rec.allies ?? []) pair('with', a)
     for (const e of rec.enemies ?? []) pair('against', e)
@@ -145,17 +150,16 @@ export function tuningFeatures(meta, rec, contexts, dd) {
   if (!build) return f
 
   // Famille de build jouée (premier objet légendaire).
-  let prior = build.winRate ?? 0.5
+  const prior = build.winRate ?? 0.5
   let family = null
   const variants = build.variants ?? []
   if (variants.length >= 2 && rec.core?.length) {
     const first = itemName(rec.core[0])
     family = variants.find((v) => v.key === first) ?? null
     if (family) {
-      const base = smooth(family.games, family.winRate, prior, 60)
+      const base = smooth(family.games, family.winRate, prior, P.fam)
       f.famBase = base - prior
-      f.famCtx = contextShift(family.contexts, base, contexts)
-      prior = family.winRate
+      f.famCtx = contextShift(family.contexts, base, contexts, P.famCtx)
     }
   }
 
@@ -183,11 +187,13 @@ export function tuningFeatures(meta, rec, contexts, dd) {
     if (!list || list.length < 2 || played[kind] === null) continue
     const o = list.find((x) => valueOf[kind](x) === played[kind])
     if (!o) continue
-    const base = smooth(o.games, o.winRate, prior, 40)
-    f.choiceBase += base - prior
-    f.choiceCtx += contextShift(o.contexts, base, contexts)
+    // Pages de runes d'une famille : comparées au taux de la famille ; le reste, à celui du champion.
+    const ref = kind === 'runes' && family?.runeChoices ? family.winRate : prior
+    const base = smooth(o.games, o.winRate, ref, P[kind])
+    f.choiceBase += base - ref
+    f.choiceCtx += contextShift(o.contexts, base, contexts, P.choiceCtx)
     const vs = kind === 'pet' && rec.enemyJungler ? o.vs?.[rec.enemyJungler] : null
-    if (vs) f.choiceCtx += smooth(vs[0], vs[1], base, 30) - base
+    if (vs) f.choiceCtx += smooth(vs[0], vs[1], base, P.choiceCtx) - base
   }
 
   // Objets achetés face aux adversaires présents et à leurs objets.
@@ -276,5 +282,5 @@ export function solveTuning(t, { minGames = MIN_TUNING_GAMES } = {}) {
     weights[key] = round2(clamp(1 + (w[pos] - 1) * shrink, 0, 2))
     se[key] = round2(s)
   })
-  return { games: Math.round(n), weights, se }
+  return { v: TUNING_VERSION, games: Math.round(n), weights, se }
 }
