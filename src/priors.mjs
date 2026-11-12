@@ -1,7 +1,16 @@
 // Mesure, sur les compteurs du patch, de la force de lissage de chaque famille de statistiques
 // (voir stats.mjs) et des effets d'objets regroupés entre champions.
 
-import { K_MAX, momPrior, partitionCells, popularitySlope, posterior } from './stats.mjs'
+import {
+  K_MAX,
+  addSums,
+  clamp,
+  momPrior,
+  momSums,
+  partitionCells,
+  popularitySlope,
+  posterior
+} from './stats.mjs'
 
 /** États de la partie au moment d'un achat : en avance, à égalité, en retard (or des équipes). */
 export const STATES = ['a', 'e', 'b']
@@ -23,6 +32,8 @@ const CHOICE_KINDS = ['runes', 'boots', 'pet', 'skills']
 export const DEFAULT_PRIORS = {
   vs: 1000,
   pair: K_MAX,
+  with: K_MAX,
+  against: K_MAX,
   comp: 1500,
   fam: 5000,
   famCtx: 5000,
@@ -44,44 +55,80 @@ export const DEFAULT_PRIORS = {
 const rate = ([g, w]) => (g > 0 ? w / g : 0)
 const binVar = (p, n) => (p * (1 - p)) / n
 
-/** Effet « général » d'un allié ou adversaire sur tous les champions du poste (retiré des paires). */
-function generalEffects(champs, side) {
-  const acc = {}
-  for (const c of champs) {
+/**
+ * Cellules d'interaction entre les champions du poste et leurs partenaires d'un côté de la partie
+ * (`vs` : adversaire direct, `with` : alliés, `against` : autres adversaires) : écart du taux de
+ * victoire à celui du champion, une fois retiré l'effet « général » du partenaire (un champion
+ * fort fait perdre tous ses adversaires : cela ne dit rien d'un affrontement en particulier).
+ * Chaque cellule : [parties, écart, variance due au hasard, champion, partenaire]. La variance tient
+ * compte des deux moyennes retirées (celle du champion et celle du partenaire).
+ */
+export function interactionCells(champs, side, { minGames = 10 } = {}) {
+  const partner = {}
+  const rows = []
+  for (const [id, c] of champs) {
     const b = c.w / c.g
+    let n = 0
     for (const [p, [g, w]] of Object.entries(c[side] ?? {})) {
-      const a = (acc[p] ??= [0, 0])
+      if (g < minGames) continue
+      const a = (partner[p] ??= [0, 0])
       a[0] += g
       a[1] += g * (w / g - b)
+      n += g
+    }
+    rows.push([id, c, b, n])
+  }
+  const out = []
+  for (const [id, c, b, n] of rows) {
+    for (const [p, [g, w]] of Object.entries(c[side] ?? {})) {
+      if (g < minGames) continue
+      const [pn, ps] = partner[p]
+      const lost = Math.max(0, 1 - g / pn - g / n)
+      out.push([g, w / g - b - ps / pn, binVar(b, g) * lost, id, p])
     }
   }
-  return Object.fromEntries(Object.entries(acc).map(([p, [g, s]]) => [p, g > 0 ? s / g : 0]))
+  return out
 }
 
 /**
- * Force de lissage (nombre de parties a priori) de chaque famille de statistiques, mesurée sur
- * l'état du patch, et lien popularité → victoire pour les objets, compétences et départs.
+ * Correction de la variance due au hasard. Les compteurs repris du patch précédent avec un poids
+ * réduit (25 %) sont plus précis que leur nombre de parties ne le laisse croire : sans correction,
+ * le hasard est surestimé et tous les vrais écarts paraissent nuls en début de patch. Les paires
+ * d'alliés servent de témoin : sur les parties tenues à l'écart, une paire d'alliés qui « marchait
+ * bien » ne gagne pas plus ensuite, leur écart observé est donc du hasard pur. Le rapport entre leur
+ * variance observée et la variance attendue donne la correction (1 = aucune ; jamais plus de 1).
  */
-export function measurePriors(state) {
-  const champs = Object.values(state.champs ?? {}).filter((c) => c.g >= 300)
-  const cells = {
-    vs: [],
-    pair: [],
-    comp: [],
-    fam: [],
-    famCtx: [],
-    runes: [],
-    keystone: [],
-    boots: [],
-    skills: [],
-    start: [],
-    pet: [],
-    c1: [],
-    c2: [],
-    c3: [],
-    slot: [],
-    choiceCtx: []
-  }
+export function noiseScale(withCells) {
+  const s = momSums(withCells)
+  if (s.cells < 500 || s.sn < 20000 || !(s.noise > 0)) return 1
+  return clamp(s.obs / s.noise, 0.2, 1)
+}
+
+const FAMILIES = [
+  'vs',
+  'with',
+  'against',
+  'comp',
+  'fam',
+  'famCtx',
+  'runes',
+  'keystone',
+  'boots',
+  'skills',
+  'start',
+  'pet',
+  'c1',
+  'c2',
+  'c3',
+  'slot',
+  'choiceCtx'
+]
+
+/** Cellules [parties, écart, variance] de chaque famille de statistiques, et correction du hasard. */
+function priorCells(state) {
+  const entries = Object.entries(state.champs ?? {}).filter(([, c]) => c.g >= 300)
+  const champs = entries.map(([, c]) => c)
+  const cells = Object.fromEntries(FAMILIES.map((k) => [k, []]))
 
   // Écart moyen de tous les champions dans chaque contexte de composition (retiré : il ne dit rien
   // du champion).
@@ -97,15 +144,10 @@ export function measurePriors(state) {
     }
     ctxMean[ctx] = g > 0 ? s / g : 0
   }
-  const general = { with: generalEffects(champs, 'with'), against: generalEffects(champs, 'against') }
+  for (const side of ['vs', 'with', 'against']) cells[side] = interactionCells(entries, side)
 
   for (const c of champs) {
     const b = c.w / c.g
-    for (const [, [g, w]] of Object.entries(c.vs ?? {}))
-      if (g >= 10) cells.vs.push([g, w / g - b, binVar(b, g)])
-    for (const side of ['with', 'against'])
-      for (const [p, [g, w]] of Object.entries(c[side] ?? {}))
-        if (g >= 10) cells.pair.push([g, w / g - b - (general[side][p] ?? 0), binVar(b, g)])
 
     // Écart du champion dans chaque contexte (sert aussi aux familles et aux choix).
     const ctxShift = {}
@@ -171,15 +213,102 @@ export function measurePriors(state) {
       }
     }
   }
+  return { cells, scale: noiseScale(cells.with) }
+}
 
+/**
+ * Sommes de la méthode des moments de chaque famille pour ce poste (hasard corrigé). Additionnées
+ * sur tous les postes et niveaux (poolEvidence), elles donnent une mesure regroupée bien plus
+ * précise, vers laquelle la mesure de chaque poste est rapprochée (voir momPrior).
+ */
+export function priorEvidence(state) {
+  const { cells, scale } = priorCells(state)
+  return Object.fromEntries(FAMILIES.map((k) => [k, momSums(cells[k], scale)]))
+}
+
+export function poolEvidence(states) {
+  const pooled = {}
+  for (const state of states) {
+    for (const [k, sums] of Object.entries(priorEvidence(state))) pooled[k] = addSums(pooled[k], sums)
+  }
+  return pooled
+}
+
+/**
+ * Force de lissage (nombre de parties a priori) de chaque famille de statistiques, mesurée sur
+ * l'état du patch, et lien popularité → victoire pour les objets, compétences et départs.
+ * `pooled` : mesure regroupée de tous les postes (poolEvidence), facultative.
+ */
+export function measurePriors(state, pooled = null) {
+  const { cells, scale } = priorCells(state)
   const out = {}
-  for (const [key, list] of Object.entries(cells))
-    out[key] = momPrior(list, { fallback: DEFAULT_PRIORS[key] }).k
+  for (const key of FAMILIES)
+    out[key] = momPrior(cells[key], {
+      fallback: DEFAULT_PRIORS[key],
+      scale,
+      pooled: pooled?.[key] ?? null
+    }).k
+  // Apps d'avant la séparation alliés / adversaires : une seule force pour les deux.
+  out.pair = Math.max(out.with, out.against)
   out.slope = {
     item: popularitySlope([...cells.c1, ...cells.c3, ...cells.slot]),
     skills: popularitySlope(cells.skills),
     start: popularitySlope(cells.start)
   }
+  out.noise = Math.round(scale * 1000) / 1000
+  return out
+}
+
+/** Effets a priori de l'équilibre de l'équipe (mesurés sur six métas, patch 16.22). */
+export const FIT_PRIOR = { ap: [-0.017, 0.008], tank: [-0.02, 0.01] }
+const FIT_KEYS = ['ap', 'tank']
+
+/**
+ * Équilibre de l'équipe : ce que coûte de ressembler à ses alliés. Régression des écarts des
+ * paires d'alliés (effet général retiré) sur le produit des profils centrés : dégâts magiques ×
+ * dégâts magiques (une équipe tout magique ou tout physique gagne moins : l'adversaire n'a qu'une
+ * résistance à acheter) et résistance × résistance (une deuxième ligne de front apporte moins que
+ * la première). Chaque coefficient mesuré est rapproché d'une valeur a priori selon son
+ * incertitude et borné à [-0,04 ; 0]. Renvoie { ap, tank, center, games } ou null sans profils.
+ * L'effet pour un champion c avec un allié a : coef × (profil(c) − centre[0]) × (profil(a) − centre[1]).
+ */
+export function measureFit(state, profiles) {
+  if (!profiles || Object.keys(profiles).length < 30) return null
+  const entries = Object.entries(state.champs ?? {}).filter(([, c]) => c.g >= 300)
+  const all = interactionCells(entries, 'with')
+  const scale = noiseScale(all)
+  const cells = all.filter(([, , , id, p]) => profiles[id] && profiles[p])
+  const games = cells.reduce((t, [g]) => t + g, 0)
+  const center = {}
+  for (const key of FIT_KEYS) {
+    const mean = (index) => cells.reduce((t, c) => t + c[0] * profiles[c[index]][key], 0) / games
+    center[key] = games > 0 ? [mean(3), mean(4)].map((x) => Math.round(x * 1000) / 1000) : [0.5, 0.5]
+  }
+  const out = { center, games: Math.round(games) }
+  // Deux variables : équations normales 2 × 2.
+  let a11 = 0
+  let a12 = 0
+  let a22 = 0
+  let b1 = 0
+  let b2 = 0
+  for (const [g, dev, , id, p] of cells) {
+    const x1 = (profiles[id].ap - center.ap[0]) * (profiles[p].ap - center.ap[1])
+    const x2 = (profiles[id].tank - center.tank[0]) * (profiles[p].tank - center.tank[1])
+    a11 += g * x1 * x1
+    a12 += g * x1 * x2
+    a22 += g * x2 * x2
+    b1 += g * x1 * dev
+    b2 += g * x2 * dev
+  }
+  const det = a11 * a22 - a12 * a12
+  const measured = cells.length >= 1000 && games >= 50000 && det > 0
+  const beta = measured ? [(a22 * b1 - a12 * b2) / det, (a11 * b2 - a12 * b1) / det] : [0, 0]
+  const variance = measured ? [(0.25 * scale * a22) / det, (0.25 * scale * a11) / det] : [0, 0]
+  FIT_KEYS.forEach((key, i) => {
+    const [mean, sd] = FIT_PRIOR[key]
+    const w = measured ? sd ** 2 / (sd ** 2 + variance[i]) : 0
+    out[key] = Math.round(clamp(mean + w * (beta[i] - mean), -0.04, 0) * 10000) / 10000
+  })
   return out
 }
 

@@ -18,23 +18,68 @@ export const K_MIN = 150
 export const K_MAX = 20000
 
 /**
- * Force du lissage mesurée sur des cellules [parties, écart observé, variance due au hasard].
- * Trop peu de cellules : valeur par défaut. Aucun écart réel détectable : lissage maximal.
+ * Sommes de la méthode des moments sur des cellules [parties, écart observé, variance due au
+ * hasard]. `scale` : correction de la variance du hasard (voir noiseScale dans priors.mjs).
+ * Les sommes s'additionnent d'un poste à l'autre (addSums) pour une mesure regroupée.
  */
-export function momPrior(cells, { fallback = 2000, minCells = 40, minGames = 5000 } = {}) {
-  let sn = 0
-  let obs = 0
-  let noise = 0
+export function momSums(cells, scale = 1) {
+  const s = { sn: 0, obs: 0, noise: 0, q: 0, cells: 0 }
   for (const [n, dev, v] of cells) {
     if (!(n > 0) || !Number.isFinite(dev) || !Number.isFinite(v)) continue
-    sn += n
-    obs += n * dev * dev
-    noise += n * v
+    const nv = n * v * scale
+    s.sn += n
+    s.obs += n * dev * dev
+    s.noise += nv
+    s.q += nv * nv
+    s.cells++
   }
-  if (cells.length < minCells || sn < minGames) return { k: fallback, tau: null, cells: cells.length }
-  const tau2 = (obs - noise) / sn
+  return s
+}
+
+export const addSums = (a, b) =>
+  a
+    ? {
+        sn: a.sn + b.sn,
+        obs: a.obs + b.obs,
+        noise: a.noise + b.noise,
+        q: a.q + b.q,
+        cells: a.cells + b.cells
+      }
+    : { ...b }
+
+/** Variance des vrais écarts (τ²) et son incertitude, d'après des sommes (null si vides). */
+export function momEstimate(s) {
+  if (!s || !(s.sn > 0)) return null
+  return { tau2: (s.obs - s.noise) / s.sn, se: Math.sqrt(2 * s.q) / s.sn }
+}
+
+/** Part de la variance des vrais écarts qui peut différer d'un poste à l'autre (écart-type). */
+const SLOT_SPREAD = 0.75
+
+/**
+ * Force du lissage mesurée sur des cellules [parties, écart observé, variance due au hasard].
+ * Trop peu de cellules : valeur par défaut. Aucun écart réel détectable : lissage maximal.
+ * `pooled` : sommes de la même famille sur tous les postes et niveaux (momSums additionnées). La
+ * mesure du poste, souvent imprécise, est alors rapprochée de la mesure regroupée selon son
+ * incertitude ; un poste sans assez de cellules prend la mesure regroupée.
+ */
+export function momPrior(
+  cells,
+  { fallback = 2000, minCells = 40, minGames = 5000, scale = 1, pooled = null } = {}
+) {
+  const sums = momSums(cells, scale)
+  const enough = (s) => !!s && s.cells >= minCells && s.sn >= minGames
+  const own = enough(sums) ? momEstimate(sums) : null
+  const all = enough(pooled) ? momEstimate(pooled) : null
+  if (!own && !all) return { k: fallback, tau: null, cells: sums.cells, sums }
+  let tau2
+  if (own && all) {
+    const mean = Math.max(0, all.tau2)
+    const spread = (SLOT_SPREAD * mean) ** 2 + all.se ** 2
+    tau2 = mean + (spread / (spread + own.se ** 2)) * (own.tau2 - mean)
+  } else tau2 = (own ?? all).tau2
   const k = tau2 > 0 ? clamp(0.25 / tau2, K_MIN, K_MAX) : K_MAX
-  return { k: Math.round(k), tau: Math.sqrt(Math.max(0, tau2)), cells: cells.length }
+  return { k: Math.round(k), tau: Math.sqrt(Math.max(0, tau2)), cells: sums.cells, sums }
 }
 
 /**

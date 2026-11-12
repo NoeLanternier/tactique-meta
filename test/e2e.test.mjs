@@ -44,6 +44,31 @@ test('collecte complète : Master+ et Or à Émeraude, puis réglage le lendemai
   }
   assert.equal(master.role, 'jungle')
 
+  // Modes : une méta par mode, tous rangs confondus, sans poste ni familier.
+  const aram = JSON.parse(readFileSync(join(out, 'meta-aram.json'), 'utf-8'))
+  assert.equal(aram.mode, 'aram')
+  assert.equal(aram.role, 'aram')
+  assert.equal(aram.bracket, 'all')
+  assert.ok(aram.builds.length > 0 && aram.builds.every((b) => b.pet === null))
+  assert.deepEqual(aram.features, { runes: true, augments: false })
+  // Repères propres aux modes (dégâts et or par minute, morts, part des dégâts).
+  assert.ok(aram.benchmarks._all.dmgPerMin > 0 && aram.benchmarks._all.deathsPer10 > 0)
+  // Alliés et adversaires : les dix joueurs, pas d'adversaire direct.
+  assert.deepEqual(aram.junglers.LeeSin.vs, {})
+  assert.ok(Object.keys(aram.junglers.LeeSin.against).length > 0)
+  assert.ok(existsSync(join(out, 'state', 'modes', 'aram', '16.21.json')))
+  // ARAM Mayhem : pas de runes, des augments (noms anglais et français, rareté).
+  const mayhem = JSON.parse(readFileSync(join(out, 'meta-mayhem.json'), 'utf-8'))
+  assert.deepEqual(mayhem.features, { runes: false, augments: true })
+  assert.equal(mayhem.augmentInfo['1205'].nameFr, 'ADAPtation')
+  assert.equal(mayhem.augmentInfo['206'].rarity, 'prismatic')
+  assert.ok(mayhem.augmentInfo['1205'].games > 0)
+  assert.ok(mayhem.builds.some((b) => b.augments?.length))
+  // Modes temporaires absents : rien d'écrit, signalé dans le journal.
+  assert.ok(!existsSync(join(out, 'meta-urf.json')))
+  assert.match(first.stdout, /\[URF\] terminé : 0 nouvelles parties/)
+  assert.match(first.stdout, /modes \d+\)/)
+
   // Le lendemain (mêmes parties déjà vues) : la méta de la veille sert au backtest et au réglage.
   const second = run({ MOCK_DAY: '2' })
   assert.equal(second.status, 0, second.stdout + second.stderr)

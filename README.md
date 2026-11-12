@@ -48,7 +48,9 @@ soigne et encaisse davantage : les valeurs observées liaient le contexte à l'i
 6. Calcule le taux de victoire de chaque jungler, de chaque affrontement de junglers, avec chaque
    champion allié et contre chaque adversaire, selon la composition adverse (équipe très AP, très
    AD, soins, résistante, contrôles), et son taux de bannissement (conseils de pick et de ban dans
-   l'app, qui ne tiennent compte que des champions déjà choisis pendant la draft).
+   l'app, qui ne tiennent compte que des champions déjà choisis pendant la draft). Pour les
+   affrontements, alliés et adversaires, seul l'écart propre au champion compte (voir « Lissage
+   mesuré »), et l'équilibre de l'équipe (dégâts, ligne de front) est mesuré à part.
 7. Mesure l'effet de chaque objet **par rapport aux autres objets achetés au même rang** (4e, 5e…
    objet) **et dans le même état de la partie** (équipe en avance, à égalité ou en retard d'au
    moins 5 % d'or au moment de l'achat), et sa minute moyenne d'achat. Sans cela, les objets
@@ -110,8 +112,10 @@ Ces forces sont publiées dans `meta.json` (`priors`) et l'app applique le même
 | Statistique | Vrai écart (écart-type) | k |
 | --- | --- | --- |
 | Force d'un champion à son poste | ≈ 1,5 point | ≈ 1 000 |
-| Affrontement direct (voie) | 1,3 à 2,3 points (0 en jungle) | 500 à 1 500 |
-| Synergie avec un allié / contre un adversaire hors voie | non mesurable | maximum |
+| Affrontement direct (voie), propre au champion | 1 à 2,7 points | 350 à 2 500 |
+| Synergie avec un allié | non mesurable | maximum |
+| Contre un adversaire hors voie, propre au champion | 0,6 à 0,8 point | 4 000 à 7 000 |
+| Équilibre de l'équipe (magique / physique, ligne de front) | jusqu'à 2 points | mesuré à part |
 | Champion selon la composition adverse | 0 à 2 points | 600 à maximum |
 | Famille de build, clé de voûte | 0,4 à 1 point | 2 500 à 15 000 |
 | Page de runes, bottes, compétences, départ | 0,5 à 1,8 point | 700 à 6 500 |
@@ -123,9 +127,61 @@ Ces forces sont publiées dans `meta.json` (`priors`) et l'app applique le même
 être distingué du hasard avec ce nombre de parties : il ne pèse alors presque rien, et pèsera
 davantage de lui-même quand il y aura plus de parties (clé de production).
 
+**Écart propre au champion.** Un champion fort fait perdre tous ses adversaires : « 45 % contre
+Fizz » ne dit rien d'un pick si tous les champions du poste font 45 % contre Fizz. Pour les
+affrontements, les alliés et les adversaires, la collecte retire donc l'effet général de chaque
+partenaire (sa moyenne sur tous les champions du poste) et ne mesure que ce qui reste ; l'app fait
+de même. C'est le seul écart qui se retrouve sur les parties suivantes.
+
+**Mesure regroupée.** Chaque force est mesurée sur chaque poste et niveau, puis rapprochée de la
+même mesure faite sur les six métas ensemble (bien plus précise) selon son incertitude. Le hasard
+est aussi corrigé pour les compteurs repris du patch précédent avec un poids réduit, plus précis
+que leur nombre de parties ne le laisse croire (champ `noise` de `priors`).
+
+**Équilibre de l'équipe** (`fit` dans `meta.json`) : régression des écarts propres aux paires
+d'alliés sur le produit des profils (dégâts magiques × dégâts magiques, résistance × résistance).
+Une équipe toute magique ou toute physique, ou une deuxième ligne de front, gagne moins ; l'app
+en déduit l'effet de chaque pick selon les alliés déjà choisis, dès le premier.
+
+Validation hors échantillon (parties du 9 au 12 novembre prédites avec les métas du 9, six métas) :
+l'équilibre de l'équipe prédit les parties suivantes à 88 % de sa taille (z = 6,7) ; les
+affrontements directs et les adversaires hors voie sont prédits eux aussi (z = 6,2 et 5,3), les
+synergies avec un allié ne le sont pas (z = 0,7).
+
 Validation hors échantillon (parties du 10 et 11 novembre prédites avec la méta du 9) : avec
 l'ancien lissage fixe, l'effet prédit d'un affrontement direct était 4 à 20 fois trop fort, et la
 prédiction était moins bonne que de ne rien prédire ; avec le lissage mesuré, elle est calibrée.
+
+## Modes : ARAM, ARAM Mayhem, modes temporaires
+
+En plus du classé, la collecte lit les parties de plusieurs modes, chacun avec sa méta
+(`meta-aram.json`, `meta-mayhem.json`, `meta-mayhem-classic.json`, `meta-arurf.json`,
+`meta-urf.json`, `meta-ofa.json`, `meta-brawl.json`) et son état (`state/modes/<mode>/`) :
+
+| Mode | File interrogée | Carte | Particularités |
+| --- | --- | --- | --- |
+| ARAM | 450 | Abîme hurlant | champions au hasard, banc et relances |
+| ARAM Mayhem | 2400 | Abîme hurlant | augments (niveaux 3, 7, 11, 15), runes désactivées |
+| ARAM Mayhem Classic-ish | 2450 | Abîme hurlant | temporaire, augments |
+| ARURF, URF, Un pour tous, Brawl | 900, 1900, 1020, 2300 | Faille / autre | temporaires |
+
+- **Joueurs** : ceux du classement Or à Émeraude des régions de la méta Or (`MODE_REGIONS`
+  pour en choisir d'autres), tous rangs confondus : les modes n'ont qu'un niveau de données.
+- **Budget** : la clé est partagée avec le classé. Tant que le classé collecte, les modes ne
+  prennent pas plus de **25 %** des requêtes de chaque serveur (40 % avec une clé de production) ;
+  quand le classé a fini, ils prennent tout le reste.
+- **Modes temporaires** : si aucun des 25 premiers joueurs n'a de partie récente dans ce mode, il
+  n'est plus interrogé jusqu'à la collecte suivante ; sa méta et son état précédents sont gardés.
+- **Par partie**, les dix joueurs comptent (pas de poste) : builds, départs, bottes, compétences,
+  alliés et adversaires (pas d'adversaire direct), équilibre de l'équipe, objets selon l'état de
+  la partie, avec les objets finaux de la carte du mode. Repères propres aux modes : or et
+  dégâts aux champions par minute, morts par 10 minutes, part des dégâts de l'équipe.
+- **Runes et augments** : la méta indique ce qui est réellement utilisé dans les parties
+  (`features`). En ARAM Mayhem, les builds sont publiés sans runes (`runes: null`).
+- **Augments** (`augmentInfo`, et `augments` dans chaque build) : noms anglais et français,
+  rareté et icône viennent des données du jeu (CommunityDragon). Effet de chaque augment : écart
+  du taux de victoire des joueurs qui l'ont pris à celui de leur champion, lissé (force mesurée),
+  puis, pour chaque champion, écart propre lissé vers l'effet de l'augment.
 
 ## Commandes
 
@@ -136,7 +192,7 @@ npm start                         # collecte complète (90 min par défaut ; sur
 npm test                          # tests sur données simulées
 ```
 
-Options : `--minutes 90`, `--roles jungle,mid`, `--regions euw1,kr,na1`, `--gold-regions euw1` (vide : pas de méta Or), `--min-games 40`, `--out dossier`.
+Options : `--minutes 90`, `--roles jungle,mid`, `--regions euw1,kr,na1`, `--gold-regions euw1` (vide : pas de méta Or), `--modes aram,mayhem` (vide : aucun mode), `--mode-regions euw1`, `--min-games 40`, `--out dossier`.
 
 ## Limites
 

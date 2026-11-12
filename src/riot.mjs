@@ -113,6 +113,34 @@ export class RiotClient {
     this.stats = { requests: 0, errors: 0, rateLimited: 0 }
     /** Heure limite (ms) : au-delà, les requêtes en attente sont abandonnées. */
     this.deadline = Infinity
+    /**
+     * Part des requêtes de chaque serveur réservée aux modes (ARAM…) tant que le classé collecte
+     * aussi : au-delà, les requêtes des modes attendent. Le classé seul : aucune limite.
+     */
+    this.modeShare = options.modeShare ?? 0.25
+    this.laneStamps = new Map()
+    this.stats.lanes = { main: 0, mode: 0 }
+  }
+
+  /** Requêtes récentes d'un serveur (2 dernières minutes), par file. */
+  recentLanes(host, now = Date.now()) {
+    const list = (this.laneStamps.get(host) ?? []).filter((x) => now - x.t < 120000)
+    this.laneStamps.set(host, list)
+    return list
+  }
+
+  /** Attend que la part des modes sur ce serveur repasse sous modeShare (si le classé est actif). */
+  async shareGate(host, lane) {
+    if (lane !== 'mode' || !(this.modeShare < 1)) return
+    for (;;) {
+      const now = Date.now()
+      const list = this.recentLanes(host, now)
+      const mode = list.filter((x) => x.lane === 'mode').length
+      const mainActive = list.some((x) => x.lane !== 'mode' && now - x.t < 15000)
+      if (!mainActive || list.length < 8 || mode < this.modeShare * (list.length + 1)) return
+      if (now + 100 > this.deadline) throw new DeadlineError()
+      await sleep(100)
+    }
   }
 
   limiter(host) {
@@ -133,17 +161,23 @@ export class RiotClient {
     if (own && !this.methodLimiters.has(key)) this.methodLimiters.set(key, new Limiter(own))
   }
 
-  /** GET sur https://{host}.api.riotgames.com{path}. Renvoie null si introuvable. */
-  async get(host, path) {
+  /**
+   * GET sur https://{host}.api.riotgames.com{path}. Renvoie null si introuvable. `lane` : 'main'
+   * (classé) ou 'mode' (ARAM…, limité à une part des requêtes, voir shareGate).
+   */
+  async get(host, path, lane = 'main') {
     const method = methodOf(path)
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
+        await this.shareGate(host, lane)
         await this.limiter(host).take(this.deadline)
         await this.methodLimiters.get(`${host} ${method}`)?.take(this.deadline)
       } catch (e) {
         if (e instanceof DeadlineError) return null
         throw e
       }
+      this.recentLanes(host).push({ t: Date.now(), lane })
+      this.stats.lanes[lane === 'mode' ? 'mode' : 'main']++
       let res
       try {
         res = await this.fetch(`https://${host}.api.riotgames.com${path}`, {

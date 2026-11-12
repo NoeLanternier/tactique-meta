@@ -69,7 +69,8 @@ test('critères calculés comme dans l’app', () => {
     ],
     junglers: {
       LeeSin: { games: 2000, winRate: 0.51, vs: { Viego: [100, 0.6] }, with: {}, against: {} },
-      Viego: { games: 2000, winRate: 0.5, vs: {}, with: {}, against: {} }
+      Viego: { games: 2000, winRate: 0.5, vs: {}, with: {}, against: {} },
+      Graves: { games: 2000, winRate: 0.5, vs: { Viego: [300, 0.5] }, with: {}, against: {} }
     },
     itemCounters: { 'Guardian Angel': { Zed: [500, 0.04], '#pctHp': [300, -0.02] } },
     // Lissages faibles pour ce test (les vraies valeurs sont mesurées sur les données).
@@ -90,10 +91,14 @@ test('critères calculés comme dans l’app', () => {
     foeTags: ['#pctHp']
   }
   const f = tuningFeatures(meta, rec, ['all', 'ap'], dd)
-  console.log(f)
   // Lissage bayésien empirique (moins de 10 champions mesurés : moyenne 0,5 et 600 parties a priori).
   assert.ok(Math.abs(f.pick - ((0.51 * 2000 + 0.5 * 600) / 2600 - 0.5)) < 1e-9)
-  assert.ok(f.vs > 0.03)
+  // Affrontement : écart propre à Lee Sin, une fois retiré l'effet général de Viego (moyenne des
+  // champions du poste face à lui : +2,3 points ici), lissé avec 150 parties a priori.
+  const base = (0.51 * 2000 + 0.5 * 600) / 2600
+  const general = (100 * (0.6 - base) + 300 * (0.5 - (0.5 * 2000 + 0.5 * 600) / 2600)) / 400
+  assert.ok(Math.abs(f.vs - (100 / 250) * (0.6 - base - general)) < 1e-9)
+  assert.ok(f.vs > 0.02 && f.vs < 0.03)
   assert.ok(f.famBase > 0.01 && f.famCtx > 0.03) // Sundered Sky, meilleure vs AP
   assert.ok(f.choiceCtx > 0.03) // Mercure vs AP
   assert.ok(Math.abs(f.counter - 0.02) < 1e-9) // GA : +0,04 vs Zed, −0,02 vs %PV

@@ -6,14 +6,25 @@
 // - Master+ (meta.json) sur toutes les régions ;
 // - Or à Émeraude (meta-gold.json) sur quelques régions : l'app la prend pour les joueurs de ces
 //   rangs, et garde la méta Master+ pour ce qui manque.
+// Et les modes (ARAM, ARAM Mayhem, modes temporaires : meta-aram.json…), tous rangs confondus,
+// avec une part limitée des requêtes tant que le classé collecte (voir modes.mjs).
 //
 // Variables : RIOT_API_KEY (obligatoire), REGIONS, GOLD_REGIONS (vide : pas de méta Or), MINUTES,
-// MIN_GAMES.
+// MIN_GAMES, MODES (vide : aucun mode), MODE_REGIONS (par défaut celles de la méta Or).
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { FatalError, PLATFORM_TO_REGION, RiotClient, keyKind } from './riot.mjs'
 import { loadDdragon } from './ddragon.mjs'
-import { ROLES, bansOf, extractPlayers, extractProfiles, precheck } from './extract.mjs'
+import {
+  ROLES,
+  bansOf,
+  extractModePlayers,
+  extractPlayers,
+  extractProfiles,
+  precheck,
+  precheckMode
+} from './extract.mjs'
+import { INACTIVE_AFTER, MODES, MODE_KEYS, MODE_SHARE } from './modes.mjs'
 import {
   addBans,
   addProfiles,
@@ -26,6 +37,7 @@ import {
   upgradeState
 } from './aggregate.mjs'
 import { evaluateRecord } from './backtest.mjs'
+import { poolEvidence } from './priors.mjs'
 import { addTuning, tuningFeatures } from './tuning.mjs'
 import { emptyQuality, qualityIssues, recordQuality } from './quality.mjs'
 
@@ -49,8 +61,18 @@ const config = {
   minGames: Number(arg('min-games', process.env.MIN_GAMES || '40')),
   // Postes : une méta par poste (meta.json pour la jungle, meta-top.json, meta-mid.json…).
   roles: list(arg('roles', process.env.ROLES || ROLES.join(','))).filter((r) => ROLES.includes(r)),
-  matchesPerPlayer: 20
+  matchesPerPlayer: 20,
+  // Modes (ARAM, ARAM Mayhem, modes temporaires) : une méta par mode (meta-aram.json…), collectés
+  // sur quelques régions avec une part limitée des requêtes (voir MODE_SHARE). Vide : aucun.
+  modes: list(arg('modes', process.env.MODES ?? MODE_KEYS.join(','))).filter((m) =>
+    MODE_KEYS.includes(m)
+  ),
+  modeRegions: list(arg('mode-regions', process.env.MODE_REGIONS || '')),
+  modeMatchesPerPlayer: 10
 }
+// Régions des modes : par défaut celles de la méta Or (euw1, na1), sinon la première région.
+if (!config.modeRegions.length)
+  config.modeRegions = config.goldRegions.length ? config.goldRegions : config.regions.slice(0, 1)
 
 /** Définition des contextes adverses des métas publiées (composition attendue, voir aggregate). */
 const CONTEXT_KIND = 'composition'
@@ -92,18 +114,22 @@ function shuffle(items) {
   return items
 }
 
-async function ladder(riot, platform, bracket) {
+async function ladder(riot, platform, bracket, lane = 'main') {
   const puuids = []
   const add = async (entry) => {
     if (entry.puuid) puuids.push(entry.puuid)
     else if (entry.summonerId) {
       // Anciennes réponses sans puuid : on passe par le profil d'invocateur.
-      const s = await riot.get(platform, `/lol/summoner/v4/summoners/${entry.summonerId}`)
+      const s = await riot.get(platform, `/lol/summoner/v4/summoners/${entry.summonerId}`, lane)
       if (s?.puuid) puuids.push(s.puuid)
     }
   }
   for (const tier of bracket.apex ?? []) {
-    const league = await riot.get(platform, `/lol/league/v4/${tier}/by-queue/RANKED_SOLO_5x5`)
+    const league = await riot.get(
+      platform,
+      `/lol/league/v4/${tier}/by-queue/RANKED_SOLO_5x5`,
+      lane
+    )
     for (const entry of league?.entries ?? []) await add(entry)
   }
   for (const tier of bracket.tiers ?? []) {
@@ -112,7 +138,8 @@ async function ladder(riot, platform, bracket) {
       for (let page = first; page < first + bracket.pages; page++) {
         const entries = await riot.get(
           platform,
-          `/lol/league/v4/entries/RANKED_SOLO_5x5/${tier}/${division}?page=${page}`
+          `/lol/league/v4/entries/RANKED_SOLO_5x5/${tier}/${division}?page=${page}`,
+          lane
         )
         for (const entry of entries ?? []) await add(entry)
       }
@@ -161,7 +188,7 @@ function loadState(slot, dd, seed) {
 }
 
 async function main() {
-  for (const r of new Set(BRACKETS.flatMap((b) => b.regions))) {
+  for (const r of new Set([...BRACKETS.flatMap((b) => b.regions), ...config.modeRegions])) {
     if (!PLATFORM_TO_REGION[r]) throw new FatalError(`Région inconnue : "${r}" (ex. euw1, kr, na1)`)
   }
   if (!config.roles.length) throw new FatalError(`Aucun poste valide (ex. ${ROLES.join(',')})`)
@@ -206,11 +233,114 @@ async function main() {
     })
   }
 
+  // Modes : un état et une méta par mode (état dans state/modes/<mode>/).
+  const modeRuns = config.modes.map((mode) => {
+    const slot = {
+      role: mode,
+      label: MODES[mode].label,
+      stateDir: join(OUT_DIR, 'state', 'modes', mode),
+      metaFile: join(OUT_DIR, `meta-${mode}.json`)
+    }
+    const state = loadState(slot, dd, null)
+    return {
+      mode,
+      ...slot,
+      state,
+      previous: existsSync(slot.metaFile) ? JSON.parse(readFileSync(slot.metaFile, 'utf-8')) : null,
+      processed: new Set(state.processed ?? []),
+      counters: { matches: 0, kept: 0, skipped: {} },
+      records: 0,
+      tried: 0,
+      hits: 0,
+      active: true
+    }
+  })
+  // Part des requêtes des modes : plus grande avec une clé de production.
+  const updateShare = () => {
+    if (!riot.appLimits) return
+    riot.modeShare =
+      keyKind(riot.appLimits) === 'production' ? MODE_SHARE.production : MODE_SHARE.personal
+  }
+
+  async function collectModes(platform) {
+    if (!modeRuns.length) return
+    const region = PLATFORM_TO_REGION[platform]
+    // Joueurs : ceux du classement Or à Émeraude de la région (plus de parties hors classé),
+    // sinon Master+.
+    const bracket =
+      BRACKETS.find((b) => b.key === 'gold' && b.regions.includes(platform)) ??
+      BRACKETS.find((b) => b.regions.includes(platform)) ??
+      BRACKETS[0]
+    if (!bracket) return
+    const players = await ladder(riot, platform, bracket, 'mode')
+    updateShare()
+    log(`[Modes] [${platform}] ${players.length} joueurs`)
+    for (const puuid of players) {
+      if (Date.now() > deadline) break
+      for (const run of modeRuns) {
+        if (!run.active || Date.now() > deadline) continue
+        const queue = MODES[run.mode].queues[0]
+        const ids = await riot.get(
+          region,
+          `/lol/match/v5/matches/by-puuid/${puuid}/ids?queue=${queue}&startTime=${run.state.patchStart}&count=${config.modeMatchesPerPlayer}`,
+          'mode'
+        )
+        run.tried++
+        if (ids?.length) run.hits++
+        // Mode temporaire absent en ce moment : on cesse de l'interroger pour cette collecte.
+        if (MODES[run.mode].temporary && run.hits === 0 && run.tried >= INACTIVE_AFTER) {
+          run.active = false
+          log(`[${run.label}] aucune partie récente : mode absent, plus interrogé jusqu'à la prochaine collecte.`)
+        }
+        for (const matchId of ids ?? []) {
+          if (Date.now() > deadline) break
+          if (run.processed.has(matchId)) continue
+          run.processed.add(matchId)
+          const match = await riot.get(region, `/lol/match/v5/matches/${matchId}`, 'mode')
+          run.counters.matches++
+          const check = precheckMode(match, dd.patch, run.mode)
+          if (check !== 'ok') {
+            run.counters.skipped[check] = (run.counters.skipped[check] ?? 0) + 1
+            continue
+          }
+          const timeline = await riot.get(region, `/lol/match/v5/matches/${matchId}/timeline`, 'mode')
+          if (!timeline) continue
+          // Profils des champions : ceux du mode s'il en a assez, sinon ceux du classé.
+          const profiles =
+            Object.keys(run.state.profiles ?? {}).length >= 50
+              ? run.state.profiles
+              : (runs[0]?.main.profiles ?? {})
+          for (const rec of extractModePlayers(match, timeline, dd, run.mode)) {
+            rec.enemy = expectedEnemy(profiles, rec.enemies ?? [])
+            if (
+              run.previous?.patch === dd.patch &&
+              run.previous?.contexts === CONTEXT_KIND &&
+              run.previous?.priors
+            ) {
+              const contexts = classifyContexts(run.state, rec.enemy)
+              evaluateRecord(run.previous, contexts, rec, run.state.backtest, dd)
+              if (run.previous.priors.against)
+                addTuning(run.state.tuning, tuningFeatures(run.previous, rec, contexts, dd), rec.win)
+            }
+            addRecord(run.state, rec)
+            run.records++
+          }
+          addProfiles(run.state, extractProfiles(match, dd))
+          addBans(run.state, bansOf(match, dd))
+          run.counters.kept++
+          if (run.counters.kept % 100 === 0)
+            log(`[${run.label}] ${run.counters.kept} parties analysées (${riot.stats.requests} requêtes)`)
+        }
+      }
+    }
+  }
+
   async function collect(run, platform) {
     const { bracket, roles, main, processed, counters, quality } = run
     const region = PLATFORM_TO_REGION[platform]
     const players = await ladder(riot, platform, bracket)
     log(`[${bracket.label}] [${platform}] ${players.length} joueurs`)
+    updateShare()
     if (riot.appLimits && !keyLogged) {
       keyLogged = true
       const fmt = riot.appLimits.map(([max, w]) => `${max}/${w / 1000} s`).join(', ')
@@ -255,7 +385,10 @@ async function main() {
           ) {
             const contexts = classifyContexts(slot.state, rec.enemy)
             evaluateRecord(slot.previous, contexts, rec, slot.state.backtest, dd)
-            addTuning(slot.state.tuning, tuningFeatures(slot.previous, rec, contexts, dd), rec.win)
+            // (réglage : seulement avec une méta dont l'affrontement et les paires sont mesurés en
+            // écart propre au champion, comme le calcule l'app.)
+            if (slot.previous.priors.against)
+              addTuning(slot.state.tuning, tuningFeatures(slot.previous, rec, contexts, dd), rec.win)
           }
           addRecord(slot.state, rec)
           slot.records++
@@ -271,16 +404,22 @@ async function main() {
     }
   }
 
-  await Promise.all(
-    runs.flatMap((run) =>
+  await Promise.all([
+    ...runs.flatMap((run) =>
       run.bracket.regions.map((p) =>
         collect(run, p).catch((e) => {
           if (e instanceof FatalError) throw e
           log(`[${run.bracket.label}] [${p}] erreur : ${e.message}`)
         })
       )
+    ),
+    ...config.modeRegions.map((p) =>
+      collectModes(p).catch((e) => {
+        if (e instanceof FatalError) throw e
+        log(`[Modes] [${p}] erreur : ${e.message}`)
+      })
     )
-  )
+  ])
 
   // Contrôle des données avant d'écrire quoi que ce soit : si Riot change le format de ses
   // réponses, la collecte échoue (GitHub prévient par e-mail) au lieu de publier une méta faussée.
@@ -294,13 +433,19 @@ async function main() {
     )
   }
 
+  // Mesure regroupée des lissages sur tous les postes et niveaux : celle de chaque poste, souvent
+  // imprécise, en est rapprochée (voir momPrior).
+  const evidence = poolEvidence(runs.flatMap((run) => [...run.roles.values()].map((s) => s.state)))
+
+  let srPublishedProfiles = null
   for (const { bracket, roles, main, processed, counters, quality } of runs) {
     main.processed = [...processed]
     log(
       `[${bracket.label}] terminé : ${counters.kept} nouvelles parties (${counters.matches} lues, ignorées : ${JSON.stringify(counters.skipped)})`
     )
     log(`[${bracket.label}] contrôle des données : ${JSON.stringify(quality)}`)
-    // Poste principal d'abord : ses profils de champions servent aux métas des autres postes.
+    // Poste principal d'abord : ses profils de champions servent aux métas des autres postes (et
+    // à celles des modes tant qu'ils n'en ont pas assez).
     const ordered = [...roles.values()].sort((a, b) => (a.role === mainRole ? -1 : b.role === mainRole ? 1 : 0))
     let profiles = null
     for (const slot of ordered) {
@@ -312,12 +457,18 @@ async function main() {
       for (const f of readdirSync(slot.stateDir))
         if (f.endsWith('.json') && f !== `${dd.patch}.json`) rmSync(join(slot.stateDir, f))
 
-      const meta = buildMeta(state, dd, previous, { minGames: config.minGames, role: slot.role })
+      const meta = buildMeta(state, dd, previous, {
+        minGames: config.minGames,
+        role: slot.role,
+        evidence,
+        profiles
+      })
       meta.bracket = bracket.key
       meta.role = slot.role
       meta.contexts = CONTEXT_KIND
       if (slot.role === mainRole) profiles = meta.profiles
       else if (profiles) meta.profiles = profiles
+      if (slot.role === mainRole && bracket.key === 'master') srPublishedProfiles = meta.profiles
       writeFileSync(slot.metaFile, JSON.stringify(meta, null, 2) + '\n')
 
       const L = `[${slot.label}]`
@@ -327,12 +478,55 @@ async function main() {
       )
       if (json.length > 80e6) log(`${L} ATTENTION : état de ${mb} Mo, proche de la limite de 100 Mo de GitHub.`)
       log(`${L} lissages mesurés (parties a priori) : ${JSON.stringify(meta.priors)}`)
+      if (meta.fit) log(`${L} équilibre de l'équipe : ${JSON.stringify(meta.fit)}`)
       if (meta.backtest) log(`${L} backtest : ${JSON.stringify(meta.backtest)}`)
       if (meta.tuning) log(`${L} réglage du moteur : ${JSON.stringify(meta.tuning)}`)
       else log(`${L} réglage du moteur : ${Math.round(state.tuning.n)} parties (il en faut 2000)`)
     }
   }
-  log(`Requêtes : ${riot.stats.requests}, limites atteintes : ${riot.stats.rateLimited}.`)
+  // Modes : même calcul que pour un poste, avec la mesure regroupée des modes entre eux (leurs
+  // écarts n'ont pas la taille de ceux de la Faille).
+  const modeEvidence = poolEvidence(modeRuns.map((r) => r.state))
+  const srProfiles = srPublishedProfiles
+  for (const run of modeRuns) {
+    const { state, previous } = run
+    state.processed = [...run.processed]
+    const L = `[${run.label}]`
+    log(
+      `${L} terminé : ${run.counters.kept} nouvelles parties (${run.counters.matches} lues, ignorées : ${JSON.stringify(run.counters.skipped)})`
+    )
+    // Mode absent et aucune donnée sur ce patch : on garde la méta et l'état précédents tels quels.
+    if (!run.records && Object.keys(state.champs ?? {}).length === 0) continue
+    state.updatedAt = new Date().toISOString()
+    const json = JSON.stringify(state)
+    writeFileSync(join(run.stateDir, `${dd.patch}.json`), json)
+    for (const f of readdirSync(run.stateDir))
+      if (f.endsWith('.json') && f !== `${dd.patch}.json`) rmSync(join(run.stateDir, f))
+    const ownProfiles = Object.keys(state.profiles ?? {}).length >= 50
+    const meta = buildMeta(state, dd, previous, {
+      minGames: config.minGames,
+      role: run.mode,
+      mode: run.mode,
+      evidence: modeEvidence,
+      ...(ownProfiles || !srProfiles ? {} : { profiles: srProfiles })
+    })
+    meta.bracket = 'all'
+    meta.role = run.mode
+    meta.contexts = CONTEXT_KIND
+    if (Object.keys(meta.profiles ?? {}).length < 50 && srProfiles) meta.profiles = srProfiles
+    writeFileSync(run.metaFile, JSON.stringify(meta, null, 2) + '\n')
+    const mb = (json.length / 1e6).toFixed(1)
+    log(
+      `${L} ${run.records} joueurs ajoutés, ${meta.sampleGames} sur le patch, ${meta.freshBuilds} builds à jour (état : ${mb} Mo).`
+    )
+    log(`${L} lissages mesurés : ${JSON.stringify(meta.priors)}`)
+    if (meta.features) log(`${L} runes et augments utilisés : ${JSON.stringify(meta.features)}`)
+    if (meta.augmentInfo)
+      log(`${L} ${Object.keys(meta.augmentInfo).length} augments publiés, lissage ${JSON.stringify(meta.augmentPriors)}`)
+  }
+  log(
+    `Requêtes : ${riot.stats.requests} (classé ${riot.stats.lanes.main}, modes ${riot.stats.lanes.mode}), limites atteintes : ${riot.stats.rateLimited}.`
+  )
 }
 
 main().catch((e) => {

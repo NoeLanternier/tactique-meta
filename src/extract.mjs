@@ -1,12 +1,59 @@
 // Extraction des informations de build des deux junglers d'une partie classée.
-import { patchOf } from './ddragon.mjs'
+import { legendaryOn, patchOf } from './ddragon.mjs'
 import { stateOfLead } from './priors.mjs'
+import { MODES } from './modes.mjs'
 
 export const RANKED_SOLO = 420
 /** Balises (données gratuitement, pas un choix de départ). */
 const TRINKETS = new Set([3340, 3363, 3364, 3330])
 const MIN_DURATION = 15 * 60 // en dessous : remake / abandon précoce, peu représentatif
 const SKILLS = ['', 'Q', 'W', 'E', 'R']
+
+/** Parties des modes : plus courtes (ARAM : 15 à 20 min) ; en dessous de 8 min, abandon ou remake. */
+const MIN_MODE_DURATION = 8 * 60
+
+/** Contrôle rapide d'une partie d'un mode (ARAM…) avant de télécharger la timeline. */
+export function precheckMode(match, patch, mode) {
+  const info = match?.info
+  if (!info) return 'invalide'
+  const m = MODES[mode]
+  if (!m || !m.queues.includes(info.queueId)) return 'file'
+  if (patchOf(info.gameVersion) !== patch) return 'ancien patch'
+  if ((info.gameDuration ?? 0) < MIN_MODE_DURATION) return 'trop courte'
+  if ((info.participants ?? []).length !== 10) return 'joueurs'
+  return 'ok'
+}
+
+/** Augments choisis par un joueur (ARAM Mayhem), dans l'ordre. */
+export function augmentsOf(p) {
+  const out = []
+  for (let i = 1; i <= 6; i++) {
+    const id = Number(p?.[`playerAugment${i}`])
+    if (id > 0) out.push(id)
+  }
+  return out
+}
+
+/**
+ * Repères d'un joueur dans un mode sans voie : ceux de la Faille (farm, or, niveau, objets…), plus
+ * or et dégâts aux champions par minute, morts par 10 minutes et part des dégâts de l'équipe.
+ */
+export function modeBenchOf(info, p, timeline, events, dd, mapId) {
+  const base = benchOf(info, p, timeline, events, dd, mapId)
+  const minutes = (info.gameDuration ?? 0) / 60
+  const dmg = (x) =>
+    (Number(x.physicalDamageDealtToChampions) || 0) + (Number(x.magicDamageDealtToChampions) || 0)
+  const teamDmg = info.participants
+    .filter((x) => x.teamId === p.teamId)
+    .reduce((t, x) => t + dmg(x), 0)
+  return {
+    ...base,
+    goldPerMin: minutes > 0 ? (Number(p.goldEarned) || 0) / minutes : null,
+    dmgPerMin: minutes > 0 ? dmg(p) / minutes : null,
+    deathsPer10: minutes > 0 ? ((Number(p.deaths) || 0) / minutes) * 10 : null,
+    dmgShare: teamDmg > 0 ? dmg(p) / teamDmg : null
+  }
+}
 
 /** Contrôle rapide avant de télécharger la timeline (qui coûte une requête de plus). */
 export function precheck(match, patch) {
@@ -99,12 +146,12 @@ export const FOE_TRAIT_MIN = {
 }
 
 /** Caractéristiques adverses d'une partie : '#antiheal', '#pctHp'… */
-export function foeTagsOf(foes, dd) {
+export function foeTagsOf(foes, dd, mapId = 11) {
   const count = {}
   for (const f of foes) {
     for (let i = 0; i <= 5; i++) {
       const it = dd.items.get(Number(f[`item${i}`]))
-      if (!it?.isLegendary) continue
+      if (!legendaryOn(it, mapId)) continue
       for (const t of it.traits ?? []) count[t] = (count[t] ?? 0) + 1
     }
   }
@@ -135,7 +182,7 @@ export function skillOrder(events) {
  * Repères de jeu d'un jungler : farm, or et niveau à 10/15 min, minute des deux premiers objets
  * légendaires, participation aux éliminations, vision et balises de contrôle.
  */
-export function benchOf(info, p, timeline, events, dd) {
+export function benchOf(info, p, timeline, events, dd, mapId = 11) {
   const frames = timeline?.info?.frames ?? []
   const at = (min) => frames[min]?.participantFrames?.[String(p.participantId)] ?? null
   const cs = (f) =>
@@ -146,7 +193,7 @@ export function benchOf(info, p, timeline, events, dd) {
   const seen = new Set()
   for (const e of events) {
     if (e.type !== 'ITEM_PURCHASED' || seen.has(e.itemId)) continue
-    if (!dd.items.get(e.itemId)?.isLegendary) continue
+    if (!legendaryOn(dd.items.get(e.itemId), mapId)) continue
     seen.add(e.itemId)
     legendaryTimes.push((e.timestamp ?? 0) / 60000)
     if (legendaryTimes.length === 2) break
@@ -242,19 +289,27 @@ export function extractJunglers(match, timeline, dd) {
   return extractPlayers(match, timeline, dd, ['jungle'])
 }
 
+/** Joueurs d'une partie d'un mode sans voie (ARAM…) : les dix, sans adversaire direct. */
+export function extractModePlayers(match, timeline, dd, mode) {
+  return extractPlayers(match, timeline, dd, [], mode)
+}
+
 /**
  * Joueurs d'une partie aux postes demandés. `enemyJungler` : l'adversaire direct (le jungler
  * adverse pour un jungler, le joueur d'en face sur la même voie sinon) ; `enemies` : les autres
- * adversaires.
+ * adversaires. `mode` (ARAM…) : tous les joueurs, sans poste ni adversaire direct.
  */
-export function extractPlayers(match, timeline, dd, roles = ROLES) {
+export function extractPlayers(match, timeline, dd, roles = ROLES, mode = null) {
   const info = match.info
   const events = eventsByParticipant(timeline)
   const teamOf = new Map(info.participants.map((x) => [Number(x.participantId), x.teamId]))
+  // Carte de la partie : les objets finaux dépendent de la carte (Abîme hurlant…).
+  const mapId = mode ? Number(info.mapId) || MODES[mode]?.map || 0 : 11
+  const isFinal = (id) => legendaryOn(dd.items.get(id), mapId)
   const records = []
-  const wanted = (x) => roles.includes(ROLE_OF_POSITION[x.teamPosition])
+  const wanted = (x) => !!mode || roles.includes(ROLE_OF_POSITION[x.teamPosition])
   for (const p of info.participants.filter(wanted)) {
-    const role = ROLE_OF_POSITION[p.teamPosition]
+    const role = mode ?? ROLE_OF_POSITION[p.teamPosition]
     const jungle = role === 'jungle'
     const champ = dd.champById.get(p.championId) ?? p.championName
     const styles = p.perks?.styles ?? []
@@ -272,8 +327,7 @@ export function extractPlayers(match, timeline, dd, roles = ROLES) {
     const legendaries = []
     const legendaryMin = []
     for (const b of timed) {
-      const it = dd.items.get(b.id)
-      if (it?.isLegendary && !legendaries.includes(b.id)) {
+      if (isFinal(b.id) && !legendaries.includes(b.id)) {
         legendaries.push(b.id)
         legendaryMin.push(Math.round(b.min * 10) / 10)
       }
@@ -289,7 +343,7 @@ export function extractPlayers(match, timeline, dd, roles = ROLES) {
     // Contexte adverse réellement observé dans cette partie (dégâts, soins, résistance, contrôles).
     const foes = info.participants.filter((x) => x.teamId !== p.teamId)
     const sum = (f) => foes.reduce((acc, x) => acc + (Number(x[f]) || 0), 0)
-    const enemyJungler = foes.find((x) => x.teamPosition === p.teamPosition)
+    const enemyJungler = mode ? undefined : foes.find((x) => x.teamPosition === p.teamPosition)
     const champOf = (x) => dd.champById.get(x.championId) ?? x.championName
     // Composition des deux équipes (synergies avec les alliés, affrontements avec les adversaires).
     const allies = info.participants
@@ -301,7 +355,10 @@ export function extractPlayers(match, timeline, dd, roles = ROLES) {
     records.push({
       role,
       champ,
-      bench: benchOf(info, p, timeline, myEvents, dd),
+      bench: mode
+        ? modeBenchOf(info, p, timeline, myEvents, dd, mapId)
+        : benchOf(info, p, timeline, myEvents, dd),
+      ...(mode ? { augments: augmentsOf(p), mode } : {}),
       win: Boolean(p.win),
       runeSig,
       core: legendaries.slice(0, 3),
@@ -320,7 +377,7 @@ export function extractPlayers(match, timeline, dd, roles = ROLES) {
       allies,
       enemies,
       // Objets adverses de fin de partie qui changent la valeur des nôtres.
-      foeTags: foeTagsOf(foes, dd),
+      foeTags: foeTagsOf(foes, dd, mapId),
       // Combats contre le jungler adverse et début de partie (côté, première élimination).
       duels: junglerDuels(timeline, p.participantId, enemyJungler?.participantId),
       opening: jungle ? openingOf(timeline, p.participantId) : null,

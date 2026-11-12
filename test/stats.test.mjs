@@ -149,3 +149,67 @@ test('lissages mesurés publiés dans la méta, et adversaires de tous postes', 
   assert.equal(meta.priors.vs, priors.vs)
   assert.ok(meta.threats.Darius)
 })
+
+// Poste simulé : champions × partenaires, avec un effet général de chaque partenaire (le même pour
+// tous les champions), des interactions vraies d'écart-type `tau`, et l'équilibre magique / physique.
+function simulatedRole({ tau = 0, fitAp = 0, games = 120, champs = 40, partners = 60 } = {}) {
+  const profiles = {}
+  const state = { champs: {} }
+  const general = Array.from({ length: partners }, () => 0.03 * gauss())
+  for (let p = 0; p < partners; p++) profiles[`P${p}`] = { ap: random(), tank: random() }
+  for (let c = 0; c < champs; c++) {
+    const id = `C${c}`
+    profiles[id] = { ap: random(), tank: random() }
+    const base = 0.5 + 0.015 * gauss()
+    const row = { g: 0, w: 0, vs: {}, with: {}, against: {} }
+    for (let p = 0; p < partners; p++) {
+      const pid = `P${p}`
+      const n = Math.round(games * (0.5 + random()))
+      const fit = fitAp * (profiles[id].ap - 0.5) * (profiles[pid].ap - 0.5)
+      const rate = base + general[p] + tau * gauss() + fit
+      row.with[pid] = [n, binom(n, rate)]
+      row.against[pid] = [n, binom(n, base - general[p])]
+      row.g += n
+      row.w += row.with[pid][1]
+    }
+    state.champs[id] = row
+  }
+  return { state, profiles }
+}
+
+test('alliés et adversaires : seul l’écart propre au champion compte, mesuré sur tous les postes', async () => {
+  const { interactionCells, measurePriors, poolEvidence, priorEvidence } = await import('../src/priors.mjs')
+  // L'effet général des partenaires (±3 points) est retiré : il ne passe pas pour une interaction.
+  const flat = simulatedRole({ tau: 0 })
+  // (côté alliés : le taux du champion vient des mêmes parties, comme dans les vraies données.)
+  const cells = interactionCells(Object.entries(flat.state.champs), 'with')
+  assert.ok(cells.length > 2000)
+  assert.ok(momPrior(cells).k >= 5000, `k ${momPrior(cells).k}`)
+  // Interactions réelles de 2 points avec les alliés : retrouvées (k ≈ 0,25 / 0,02² = 625).
+  const real = simulatedRole({ tau: 0.02 })
+  const p = measurePriors(real.state)
+  assert.ok(p.with > 300 && p.with < 1500, `with ${p.with}`)
+  assert.equal(p.pair, Math.max(p.with, p.against))
+  // Mesure regroupée : un petit poste imprécis est rapproché de la mesure de tous les postes.
+  const small = simulatedRole({ tau: 0, games: 15, champs: 12, partners: 30 })
+  const pooled = poolEvidence([real.state, simulatedRole({ tau: 0.02 }).state, small.state])
+  const alone = measurePriors(small.state).with
+  const joined = measurePriors(small.state, pooled).with
+  assert.ok(joined < alone, `${joined} < ${alone}`)
+  assert.ok(priorEvidence(real.state).with.cells > 2000)
+})
+
+test('équilibre de l’équipe : une équipe toute magique ou toute physique gagne moins', async () => {
+  const { measureFit, FIT_PRIOR } = await import('../src/priors.mjs')
+  // Vrai effet : −8 points × (écart de profil du champion) × (écart de profil de l'allié).
+  const { state, profiles } = simulatedRole({ fitAp: -0.08, games: 400, champs: 60, partners: 80 })
+  const fit = measureFit(state, profiles)
+  assert.ok(fit.ap < -0.04 * 0.9 || fit.ap === -0.04, `ap ${fit.ap}`) // borné à −0,04
+  assert.ok(Math.abs(fit.center.ap[0] - 0.5) < 0.15)
+  // Aucun effet : la mesure ramène vers 0, loin de la valeur a priori.
+  const none = measureFit(simulatedRole({ games: 400, champs: 60, partners: 80 }).state, profiles)
+  assert.ok(none.ap > FIT_PRIOR.ap[0] / 2, `ap ${none.ap}`)
+  assert.ok(none.ap <= 0)
+  // Sans profils : rien.
+  assert.equal(measureFit(state, null), null)
+})

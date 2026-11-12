@@ -3,16 +3,19 @@
 // Pour éviter qu'une option jouée 3 fois avec 3 victoires passe devant tout le monde, le taux de
 // victoire est « lissé » vers celui du champion (moyenne bayésienne) et une option doit représenter
 // une part minimale des parties du champion pour être retenue.
-import { emptyTuning, solveTuning } from './tuning.mjs'
+import { TUNING_VERSION, emptyTuning, solveTuning } from './tuning.mjs'
 import { ARCHETYPES, guessArchetype } from './archetypes.mjs'
 import { bestOption, momPrior, posterior } from './stats.mjs'
 import {
   DEFAULT_PRIORS,
   STATES,
   championItemLift,
+  measureFit,
   measurePriors,
   pooledItemLifts
 } from './priors.mjs'
+import { legendaryOn } from './ddragon.mjs'
+import { MODES } from './modes.mjs'
 
 export const STATE_VERSION = 7
 /** Contextes adverses pour lesquels on mesure la performance des objets. */
@@ -103,7 +106,8 @@ export function upgradeState(state) {
   state.itemFoe ??= {}
   state.foeAll ??= {}
   state.backtest ??= emptyBacktest()
-  state.tuning ??= emptyTuning()
+  // Critères du réglage changés (voir TUNING_VERSION) : il repart de zéro.
+  if (state.tuning?.v !== TUNING_VERSION) state.tuning = emptyTuning()
   state.bans ??= { games: 0, champs: {} }
   state.version = STATE_VERSION
   return state
@@ -148,6 +152,8 @@ function champState(state, champ) {
   c.petVs ??= {}
   c.duel ??= {}
   c.open ??= { g: 0, top: 0, firstN: 0, firstMin: 0, lanes: {} }
+  // ARAM Mayhem : augments choisis avec ce champion { augment: [g, w] }.
+  c.aug ??= {}
   return c
 }
 
@@ -164,6 +170,9 @@ function familyState(c, firstItem) {
   for (const k of FAMILY_MAPS) f[k] ??= {}
   return f
 }
+
+/** Repères propres aux modes sans voie (ARAM…), en plus des autres. */
+export const MODE_BENCH_KEYS = ['goldPerMin', 'dmgPerMin', 'deathsPer10', 'dmgShare']
 
 /** Repères mesurés : somme et nombre de valeurs pour chaque indicateur. */
 export const BENCH_KEYS = [
@@ -253,12 +262,20 @@ export function addRecord(state, rec) {
   if (rec.enemyJungler) inc(c.vs, rec.enemyJungler, rec.win)
   for (const ally of rec.allies ?? []) inc(c.with, ally, rec.win)
   for (const enemy of rec.enemies ?? []) inc(c.against, enemy, rec.win)
-  for (const k of BENCH_KEYS) {
+  for (const k of [...BENCH_KEYS, ...MODE_BENCH_KEYS]) {
     const v = rec.bench?.[k]
     if (typeof v !== 'number' || !Number.isFinite(v)) continue
     const cell = (c.bench[k] ??= [0, 0])
     cell[0] += 1
     cell[1] += v
+  }
+  // Augments (ARAM Mayhem) et usage réel des runes et augments dans les modes.
+  for (const id of new Set(rec.augments ?? [])) inc(c.aug, String(id), rec.win)
+  if (rec.mode) {
+    const f = (state.feat ??= { n: 0, runes: 0, aug: 0 })
+    f.n++
+    if (rec.runeSig) f.runes++
+    if (rec.augments?.length) f.aug++
   }
   const contexts = contextsOf(state, rec.enemy)
   const items = rec.items ?? []
@@ -390,7 +407,11 @@ export function seedFromPrevious(state, previous, factor = 0.25) {
   state.foeAll = scaleDeep(previous.foeAll ?? {}, factor)
   state.ctxStats = previous.ctxStats ?? {}
   state.bans = previous.bans ? scaleDeep(previous.bans, factor) : { games: 0, champs: {} }
-  state.tuning = previous.tuning ? scaleDeep(previous.tuning, factor) : emptyTuning()
+  // (le numéro de version n'est pas un compteur : il n'est pas multiplié.)
+  state.tuning =
+    previous.tuning?.v === TUNING_VERSION
+      ? { ...scaleDeep(previous.tuning, factor), v: TUNING_VERSION }
+      : emptyTuning()
   state.seededFrom = previous.patch
   return state
 }
@@ -550,7 +571,12 @@ export function situationalStats(c, dd, { priors = DEFAULT_PRIORS, pooled = {} }
  * est le meilleur, avec un lissage mesuré sur les données (`priors`) : une option peu jouée ne
  * passe devant l'option habituelle que si son avantage est établi.
  */
-export function selectBuild(champ, c, dd, { minGames = 40, priors = DEFAULT_PRIORS, pooled } = {}) {
+export function selectBuild(
+  champ,
+  c,
+  dd,
+  { minGames = 40, priors = DEFAULT_PRIORS, pooled, allowNoRunes = false } = {}
+) {
   if (!c || c.g < minGames) return null
   const prior = c.w / c.g
   const itemName = (id) => dd.items.get(Number(id))?.name ?? null
@@ -567,8 +593,9 @@ export function selectBuild(champ, c, dd, { minGames = 40, priors = DEFAULT_PRIO
     filter: (s) => validSig(s) && keystoneOf(s) === keystone,
     k: P.runes
   })
+  // Modes sans runes (ARAM Mayhem) : build publié sans page (runes: null).
   const runes = sig ? runesFromSig(sig, dd) : null
-  if (!runes) return null
+  if (!runes && !allowNoRunes) return null
 
   // Cœur : choix conditionnel (1er objet, puis 2e sachant le 1er, puis 3e).
   const c1 = bestOption(c.c1, { k: P.c1, slope: itemSlope })
@@ -751,13 +778,13 @@ export function buildJunglerStats(state, minGames = 20) {
  * Repères Master+ par champion (moyennes du patch) et pour l'ensemble des junglers ('_all').
  * Utilisés par le bilan d'après-partie de l'app.
  */
-export function buildBenchmarks(state, minGames = 30) {
+export function buildBenchmarks(state, minGames = 30, keys = BENCH_KEYS) {
   const out = {}
   const all = {}
   let allGames = 0
   for (const [champ, c] of Object.entries(state.champs)) {
     const b = c.bench ?? {}
-    for (const k of BENCH_KEYS) {
+    for (const k of keys) {
       const [n, sum] = b[k] ?? [0, 0]
       const cell = (all[k] ??= [0, 0])
       cell[0] += n
@@ -767,7 +794,7 @@ export function buildBenchmarks(state, minGames = 30) {
     if (c.g < minGames) continue
     const row = { games: Math.round(c.g) }
     let ok = true
-    for (const k of BENCH_KEYS) {
+    for (const k of keys) {
       const [n, sum] = b[k] ?? [0, 0]
       if (n < Math.min(10, minGames)) ok = false
       else row[k] = round3(sum / n)
@@ -776,7 +803,7 @@ export function buildBenchmarks(state, minGames = 30) {
   }
   const total = { games: Math.round(allGames) }
   let ok = allGames >= minGames
-  for (const k of BENCH_KEYS) {
+  for (const k of keys) {
     const [n, sum] = all[k] ?? [0, 0]
     if (n < 10) ok = false
     else total[k] = round3(sum / n)
@@ -861,13 +888,13 @@ export function buildChoices(c, dd) {
  * parties : chacune avec son cœur, ses runes, ses options et son taux de victoire par contexte.
  * Rien si une seule famille ressort.
  */
-export function buildVariants(champ, c, dd, { minGames = 40, priors } = {}) {
+export function buildVariants(champ, c, dd, { minGames = 40, priors, allowNoRunes = false } = {}) {
   const variants = []
   const fams = Object.entries(c.fam ?? {}).sort((a, b) => b[1].g - a[1].g)
   for (const [first, f] of fams) {
     if (f.g < Math.max(30, minGames * 0.6) || f.g / c.g < 0.12) continue
     const pseudo = { ...f, c1: { [first]: [f.g, f.w] }, ctxItems: {}, sl: {} }
-    const b = selectBuild(champ, pseudo, dd, { minGames: 0, priors })
+    const b = selectBuild(champ, pseudo, dd, { minGames: 0, priors, allowNoRunes })
     if (!b) continue
     const contexts = {}
     for (const [ctx, [g, w]] of Object.entries(f.ctxBase ?? {}))
@@ -976,13 +1003,80 @@ export function backtestSummary(bt) {
  * les champions qui n'ont pas encore assez de parties (ils gardent leur numéro de patch, ce qui
  * permet à l'app de prendre les runes recommandées par Riot pour eux).
  */
-export function buildMeta(state, dd, previousMeta, options = {}) {
+/**
+ * ARAM Mayhem : effet de chaque augment. Effet regroupé (tous champions) : écart du taux de victoire
+ * des joueurs qui l'ont pris à celui de leur champion, lissé avec une force mesurée ; puis, pour
+ * chaque champion, écart propre lissé vers l'effet regroupé (force mesurée sur les écarts
+ * champion × augment). Biais connu : un augment se choisit parmi trois de même rareté, et pas au
+ * hasard ; l'écart dit ce que rapporte le choix d'un joueur, ce qui est la question posée.
+ */
+export function augmentStats(state, { minGames = 30, champMinGames = 10, max = 60 } = {}) {
+  const binVar = (p, n) => (p * (1 - p)) / n
+  const acc = {}
+  const champs = Object.entries(state.champs ?? {}).filter(([, c]) => c.g >= 50)
+  for (const [, c] of champs) {
+    const b = c.w / c.g
+    for (const [id, [g, w]] of Object.entries(c.aug ?? {})) {
+      const a = (acc[id] ??= [0, 0, 0, 0])
+      a[0] += g
+      a[1] += g * (w / g - b)
+      a[2] += g * b * (1 - b) * Math.max(0, 1 - g / c.g)
+      a[3] += w
+    }
+  }
+  const rows = Object.entries(acc).filter(([, [n]]) => n >= minGames)
+  const kPool = momPrior(
+    rows.map(([, [n, sd, sv]]) => [n, sd / n, sv / (n * n)]),
+    { fallback: 3000, minCells: 20, minGames: 5000 }
+  ).k
+  const pooled = {}
+  for (const [id, [n, sd, , w]] of rows)
+    pooled[id] = { games: Math.round(n), winRate: round3(w / n), lift: posterior(n, sd / n, kPool) }
+  const cells = []
+  for (const [, c] of champs) {
+    const b = c.w / c.g
+    for (const [id, [g, w]] of Object.entries(c.aug ?? {}))
+      if (g >= champMinGames && pooled[id])
+        cells.push([g, w / g - b - pooled[id].lift, binVar(b, g) * Math.max(0, 1 - g / c.g)])
+  }
+  const kChamp = momPrior(cells, { fallback: 2000, minCells: 40, minGames: 5000 }).k
+  const perChamp = {}
+  for (const [champ, c] of champs) {
+    const b = c.w / c.g
+    const list = Object.entries(c.aug ?? {})
+      .filter(([id, [g]]) => g >= champMinGames && pooled[id])
+      .sort((x, y) => y[1][0] - x[1][0])
+      .slice(0, max)
+      .map(([id, [g, w]]) => {
+        const lift = posterior(g, w / g - b, kChamp, pooled[id].lift)
+        return { id: Number(id), games: Math.round(g), winRate: round3(b + lift), lift: round3(lift) }
+      })
+      .sort((x, y) => y.lift - x.lift)
+    if (list.length) perChamp[champ] = list
+  }
+  for (const p of Object.values(pooled)) p.lift = round3(p.lift)
+  return { pooled, perChamp, k: { pool: kPool, champ: kChamp } }
+}
+
+/** Données Data Dragon vues depuis la carte d'un mode : objets finaux de cette carte. */
+function mapView(dd, mapId) {
+  const items = new Map()
+  for (const [id, it] of dd.items) items.set(id, { ...it, isLegendary: legendaryOn(it, mapId) })
+  return { ...dd, items }
+}
+
+export function buildMeta(state, dd0, previousMeta, options = {}) {
   const builds = []
+  // Mode (ARAM…) : objets finaux de sa carte, repères propres, augments.
+  const mode = options.mode && MODES[options.mode] ? options.mode : null
+  const dd = mode ? mapView(dd0, MODES[mode].map) : dd0
   // Force de lissage de chaque famille de statistiques, mesurée sur les parties du patch, et
   // effets d'objets regroupés entre champions.
-  const priors = measurePriors(state)
+  // (options.evidence : mesure regroupée de tous les postes, voir poolEvidence.)
+  const priors = measurePriors(state, options.evidence ?? null)
   const pooled = pooledItemLifts(state)
-  const opts = { ...options, priors, pooled }
+  // (modes : un build peut se passer de runes, désactivées en ARAM Mayhem.)
+  const opts = { ...options, priors, pooled, allowNoRunes: !!mode }
   for (const [champ, c] of Object.entries(state.champs)) {
     const b = selectBuild(champ, c, dd, opts)
     if (!b) continue
@@ -1002,29 +1096,64 @@ export function buildMeta(state, dd, previousMeta, options = {}) {
   const kept = (previousMeta?.builds ?? []).filter((b) => b?.id && !fresh.has(b.id) && b.patch)
   const sampleGames = Math.round(Object.values(state.champs).reduce((s, c) => s + c.g, 0))
   const profiles = buildProfiles(state)
+  // Si trop peu de parties (début de patch), on garde les profils précédents.
+  const published =
+    Object.keys(profiles).length >= 50 ? profiles : (previousMeta?.profiles ?? profiles)
+  // Équilibre de l'équipe (dégâts, ligne de front), mesuré avec les profils des champions
+  // (options.profiles : ceux du poste principal, les autres postes n'en tiennent pas).
+  const fit = measureFit(state, options.profiles ?? published)
+  // Modes : augments (ARAM Mayhem) et usage réel des runes et augments dans les parties.
+  const extra = {}
+  if (mode) {
+    const f = state.feat
+    if (f?.n >= 50) extra.features = { runes: f.runes / f.n >= 0.5, augments: f.aug / f.n >= 0.3 }
+    if (MODES[mode].augments || (f?.n >= 50 && f.aug / f.n >= 0.3)) {
+      const aug = augmentStats(state)
+      const allowed = dd0.augmentModes?.[MODES[mode].gameMode]
+      const info = {}
+      for (const [id, a] of dd0.augments ?? []) {
+        const stat = aug.pooled[id]
+        if (!stat && !(allowed?.has(id))) continue
+        info[id] = { name: a.name, nameFr: a.nameFr, rarity: a.rarity, icon: a.icon, ...(stat ?? {}) }
+      }
+      if (Object.keys(info).length) extra.augmentInfo = info
+      for (const b of builds) {
+        const list = aug.perChamp[b.id]
+        if (list) b.augments = list.filter((x) => info[x.id])
+      }
+      extra.augmentPriors = aug.k
+    }
+  }
   return {
     version: 2,
+    ...(mode ? { mode } : {}),
     patch: dd.patch,
     generatedAt: new Date().toISOString(),
     sampleGames,
     freshBuilds: builds.length,
     seededFrom: state.seededFrom ?? null,
     builds: [...builds, ...kept].sort((a, b) => a.id.localeCompare(b.id)),
-    // Si trop peu de parties (début de patch), on garde les profils précédents.
-    profiles: Object.keys(profiles).length >= 50 ? profiles : (previousMeta?.profiles ?? profiles),
+    profiles: published,
     junglers: buildJunglerStats(state),
     // Lissages mesurés : l'app estime chaque écart avec n / (n + k) (voir stats.mjs).
     priors,
+    ...(fit ? { fit } : {}),
     threats: buildThreats(state),
     itemCounters: buildItemCounters(state, dd),
     backtest: backtestSummary(state.backtest),
     // Réglage automatique des poids du moteur de l'app (voir tuning.mjs).
     tuning:
-      solveTuning(state.tuning) ?? (previousMeta?.tuning?.v === 2 ? previousMeta.tuning : null),
+      solveTuning(state.tuning) ??
+      (previousMeta?.tuning?.v === TUNING_VERSION ? previousMeta.tuning : null),
     // Début de patch : on garde les repères précédents tant qu'il n'y a pas assez de parties.
     benchmarks: (() => {
-      const b = buildBenchmarks(state)
+      const b = buildBenchmarks(
+        state,
+        30,
+        mode ? [...BENCH_KEYS, ...MODE_BENCH_KEYS] : BENCH_KEYS
+      )
       return b._all ? b : (previousMeta?.benchmarks ?? b)
-    })()
+    })(),
+    ...extra
   }
 }

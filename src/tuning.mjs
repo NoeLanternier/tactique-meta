@@ -31,9 +31,13 @@ export const TUNING_KEYS = [
 const P = TUNING_KEYS.length + 1 // + constante
 
 const CONTEXT_KEYS = ['ap', 'ad', 'heal', 'tank', 'cc']
-const PAIR_CAP = 0.25
-/** Version des critères : 2 = écarts lissés avec les forces mesurées (meta.priors). */
-export const TUNING_VERSION = 2
+/** Effet cumulé maximal des alliés et adversaires, en points de taux de victoire. */
+const PAIR_CAP = 0.06
+/**
+ * Version des critères : 2 = écarts lissés avec les forces mesurées (meta.priors) ; 3 = affrontement
+ * et paires réduits à l'écart propre au champion (effet général du partenaire retiré).
+ */
+export const TUNING_VERSION = 3
 /** Écart-type a priori des coefficients autour de 1 (rapprochement selon l'incertitude). */
 const PRIOR_SD = 0.5
 export const MIN_TUNING_GAMES = 2000
@@ -67,25 +71,33 @@ function contextShift(cells, base, contexts, k) {
   return sum / Math.max(1, n)
 }
 
-/** Effet « général » d'un allié ou adversaire, commun à tous les junglers (retiré dans l'app). */
-function generalEffects(meta, prior, pairK) {
-  const out = { with: new Map(), against: new Map() }
-  for (const side of ['with', 'against']) {
+/**
+ * Effet « général » de chaque partenaire, commun à tous les champions du poste : écart moyen de
+ * leur taux de victoire face à lui (vs), avec lui (with) ou contre lui (against). Un champion fort
+ * fait perdre tous ses adversaires : cela ne distingue aucun pick, l'app le retire pour ne garder
+ * que l'écart propre à chaque champion (l'interaction).
+ */
+export function generalEffects(meta, prior) {
+  const out = { vs: new Map(), with: new Map(), against: new Map() }
+  for (const side of ['vs', 'with', 'against']) {
     const acc = new Map()
     for (const j of Object.values(meta.junglers ?? {})) {
       const base = smooth(j.games, j.winRate, prior.mean, prior.k)
       for (const [champ, pair] of Object.entries(j[side] ?? {})) {
-        const d = logit(smooth(pair[0], pair[1], base, pairK)) - logit(base)
         const a = acc.get(champ) ?? [0, 0]
         a[0] += pair[0]
-        a[1] += pair[0] * d
+        a[1] += pair[0] * (pair[1] - base)
         acc.set(champ, a)
       }
     }
-    for (const [champ, [w, s]] of acc) out[side].set(champ, w > 0 ? s / w : 0)
+    for (const [champ, [w, sum]] of acc) out[side].set(champ, w > 0 ? sum / w : 0)
   }
   return out
 }
+
+/** Écart propre d'une paire [parties, taux], effet général retiré, lissé (points de taux). */
+export const interaction = (cell, base, general, k) =>
+  cell ? (cell[0] / (cell[0] + k)) * (cell[1] - base - general) : 0
 
 /**
  * Lissage du taux de victoire d'un champion (bayésien empirique, comme dans l'app) : moyenne du
@@ -112,7 +124,7 @@ function prepared(meta) {
       builds: new Map((meta.builds ?? []).map((b) => [b.id, b])),
       prior,
       priors,
-      general: generalEffects(meta, prior, priors.pair)
+      general: generalEffects(meta, prior)
     }
     cache.set(meta, p)
   }
@@ -133,17 +145,20 @@ export function tuningFeatures(meta, rec, contexts, dd) {
   if (s) {
     const base = smooth(s.games, s.winRate, shrink.mean, shrink.k)
     f.pick = base - shrink.mean
-    const vs = rec.enemyJungler ? s.vs?.[rec.enemyJungler] : null
-    if (vs) f.vs = smooth(vs[0], vs[1], base, P.vs) - base
+    // Affrontement direct, alliés et autres adversaires : écart propre au champion seulement.
+    if (rec.enemyJungler)
+      f.vs = interaction(
+        s.vs?.[rec.enemyJungler],
+        base,
+        general.vs.get(rec.enemyJungler) ?? 0,
+        P.vs
+      )
     let sum = 0
-    const pair = (side, champ) => {
-      const cell = s[side]?.[champ]
-      if (!cell) return
-      sum += logit(smooth(cell[0], cell[1], base, P.pair)) - logit(base) - (general[side].get(champ) ?? 0)
-    }
-    for (const a of rec.allies ?? []) pair('with', a)
-    for (const e of rec.enemies ?? []) pair('against', e)
-    f.pairs = sigmoid(logit(base) + clamp(sum, -PAIR_CAP, PAIR_CAP)) - base
+    for (const a of rec.allies ?? [])
+      sum += interaction(s.with?.[a], base, general.with.get(a) ?? 0, P.with ?? P.pair)
+    for (const e of rec.enemies ?? [])
+      sum += interaction(s.against?.[e], base, general.against.get(e) ?? 0, P.against ?? P.pair)
+    f.pairs = clamp(sum, -PAIR_CAP, PAIR_CAP)
   }
 
   const build = builds.get(rec.champ)
