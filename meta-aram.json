@@ -1,0 +1,2157 @@
+{
+  "version": 2,
+  "mode": "aram",
+  "patch": "16.22",
+  "generatedAt": "2026-11-13T09:23:07.938Z",
+  "sampleGames": 2010,
+  "freshBuilds": 0,
+  "seededFrom": null,
+  "builds": [],
+  "profiles": {
+    "Fiora": {
+      "ap": 0.076,
+      "tank": 0.831,
+      "cc": 0.174,
+      "heal": 0.913,
+      "shield": 0,
+      "crit": 0.004,
+      "aa": 0.267,
+      "games": 10862
+    },
+    "Graves": {
+      "ap": 0.041,
+      "tank": 0.465,
+      "cc": 0.436,
+      "heal": 0.622,
+      "shield": 0.424,
+      "crit": 1,
+      "aa": 0.012,
+      "games": 14996
+    },
+    "Leblanc": {
+      "ap": 0.932,
+      "tank": 0.157,
+      "cc": 0.32,
+      "heal": 0.163,
+      "shield": 0.331,
+      "crit": 0,
+      "aa": 0.001,
+      "games": 12215
+    },
+    "Xayah": {
+      "ap": 0.007,
+      "tank": 0.163,
+      "cc": 0.36,
+      "heal": 0.453,
+      "shield": 0.297,
+      "crit": 1,
+      "aa": 0.776,
+      "games": 17199
+    },
+    "JarvanIV": {
+      "ap": 0.076,
+      "tank": 0.727,
+      "cc": 0.465,
+      "heal": 0.587,
+      "shield": 0.762,
+      "crit": 0.02,
+      "aa": 0.003,
+      "games": 18398
+    },
+    "Chogath": {
+      "ap": 0.761,
+      "tank": 0.942,
+      "cc": 0.983,
+      "heal": 0.779,
+      "shield": 0.616,
+      "crit": 0,
+      "aa": 0.006,
+      "games": 12594
+    },
+    "Khazix": {
+      "ap": 0.067,
+      "tank": 0.5,
+      "cc": 0.145,
+      "heal": 0.802,
+      "shield": 0.006,
+      "crit": 0.076,
+      "aa": 0,
+      "games": 13052
+    },
+    "Sylas": {
+      "ap": 0.969,
+      "tank": 0.715,
+      "cc": 0.5,
+      "heal": 0.797,
+      "shield": 0.773,
+      "crit": 0.001,
+      "aa": 0.005,
+      "games": 30900
+    },
+    "Kaisa": {
+      "ap": 0.407,
+      "tank": 0.279,
+      "cc": 0.035,
+      "heal": 0.297,
+      "shield": 0.209,
+      "crit": 0.113,
+      "aa": 1,
+      "games": 41201
+    },
+    "Nautilus": {
+      "ap": 0.68,
+      "tank": 0.709,
+      "cc": 0.994,
+      "heal": 0.122,
+      "shield": 0.843,
+      "crit": 0,
+      "aa": 0,
+      "games": 28703
+    },
+    "Trundle": {
+      "ap": 0.141,
+      "tank": 0.855,
+      "cc": 0.494,
+      "heal": 0.924,
+      "shield": 0.767,
+      "crit": 0.009,
+      "aa": 0.465,
+      "games": 3395
+    },
+    "Zac": {
+      "ap": 0.923,
+      "tank": 0.948,
+      "cc": 0.907,
+      "heal": 1,
+      "shield": 0.756,
+      "crit": 0,
+      "aa": 0,
+      "games": 6607
+    },
+    "Galio": {
+      "ap": 0.981,
+      "tank": 0.762,
+      "cc": 0.814,
+      "heal": 0.116,
+      "shield": 0.878,
+      "crit": 0,
+      "aa": 0,
+      "games": 14736
+    },
+    "Draven": {
+      "ap": 0.002,
+      "tank": 0.401,
+      "cc": 0.186,
+      "heal": 0.523,
+      "shield": 0.174,
+      "crit": 1,
+      "aa": 0.096,
+      "games": 9625
+    },
+    "Leona": {
+      "ap": 0.694,
+      "tank": 0.657,
+      "cc": 0.953,
+      "heal": 0.203,
+      "shield": 0.831,
+      "crit": 0,
+      "aa": 0,
+      "games": 16147
+    },
+    "Zaahen": {
+      "ap": 0.054,
+      "tank": 0.913,
+      "cc": 0.587,
+      "heal": 0.855,
+      "shield": 0.203,
+      "crit": 0.013,
+      "aa": 0.66,
+      "games": 9686
+    },
+    "Ekko": {
+      "ap": 0.875,
+      "tank": 0.599,
+      "cc": 0.343,
+      "heal": 0.733,
+      "shield": 0.401,
+      "crit": 0,
+      "aa": 0.521,
+      "games": 18847
+    },
+    "Nunu": {
+      "ap": 0.943,
+      "tank": 0.802,
+      "cc": 0.762,
+      "heal": 0.907,
+      "shield": 0.663,
+      "crit": 0,
+      "aa": 0.001,
+      "games": 6442
+    },
+    "Jhin": {
+      "ap": 0.067,
+      "tank": 0.11,
+      "cc": 0.645,
+      "heal": 0.233,
+      "shield": 0.285,
+      "crit": 1,
+      "aa": 0.478,
+      "games": 40859
+    },
+    "Xerath": {
+      "ap": 0.972,
+      "tank": 0.006,
+      "cc": 0.535,
+      "heal": 0.012,
+      "shield": 0.349,
+      "crit": 0,
+      "aa": 0,
+      "games": 9182
+    },
+    "Jax": {
+      "ap": 0.461,
+      "tank": 0.674,
+      "cc": 0.349,
+      "heal": 0.488,
+      "shield": 0.552,
+      "crit": 0.008,
+      "aa": 0.62,
+      "games": 12984
+    },
+    "Ezreal": {
+      "ap": 0.295,
+      "tank": 0.273,
+      "cc": 0.041,
+      "heal": 0.384,
+      "shield": 0.256,
+      "crit": 0.046,
+      "aa": 0.479,
+      "games": 28817
+    },
+    "Janna": {
+      "ap": 0.832,
+      "tank": 0.052,
+      "cc": 0.767,
+      "heal": 0.674,
+      "shield": 0.983,
+      "crit": 0,
+      "aa": 0.001,
+      "games": 10998
+    },
+    "Urgot": {
+      "ap": 0.008,
+      "tank": 0.773,
+      "cc": 0.541,
+      "heal": 0.43,
+      "shield": 0.535,
+      "crit": 0.005,
+      "aa": 0.018,
+      "games": 4354
+    },
+    "Viego": {
+      "ap": 0.091,
+      "tank": 0.581,
+      "cc": 0.302,
+      "heal": 0.837,
+      "shield": 0.738,
+      "crit": 1,
+      "aa": 0.354,
+      "games": 12591
+    },
+    "Hwei": {
+      "ap": 0.957,
+      "tank": 0.087,
+      "cc": 0.547,
+      "heal": 0.041,
+      "shield": 0.86,
+      "crit": 0,
+      "aa": 0,
+      "games": 10735
+    },
+    "Nami": {
+      "ap": 0.864,
+      "tank": 0.029,
+      "cc": 0.686,
+      "heal": 0.936,
+      "shield": 0.901,
+      "crit": 0,
+      "aa": 0,
+      "games": 13550
+    },
+    "Rumble": {
+      "ap": 0.961,
+      "tank": 0.587,
+      "cc": 0.285,
+      "heal": 0.11,
+      "shield": 0.564,
+      "crit": 0,
+      "aa": 0,
+      "games": 6052
+    },
+    "Karma": {
+      "ap": 0.896,
+      "tank": 0.233,
+      "cc": 0.657,
+      "heal": 0.512,
+      "shield": 0.977,
+      "crit": 0,
+      "aa": 0,
+      "games": 16995
+    },
+    "LeeSin": {
+      "ap": 0.144,
+      "tank": 0.767,
+      "cc": 0.459,
+      "heal": 0.843,
+      "shield": 0.849,
+      "crit": 0.016,
+      "aa": 0.001,
+      "games": 29061
+    },
+    "Lissandra": {
+      "ap": 0.939,
+      "tank": 0.32,
+      "cc": 0.942,
+      "heal": 0.198,
+      "shield": 0.541,
+      "crit": 0,
+      "aa": 0,
+      "games": 10373
+    },
+    "Ryze": {
+      "ap": 0.957,
+      "tank": 0.541,
+      "cc": 0.477,
+      "heal": 0.419,
+      "shield": 0.244,
+      "crit": 0,
+      "aa": 0,
+      "games": 6397
+    },
+    "Veigar": {
+      "ap": 0.964,
+      "tank": 0.169,
+      "cc": 0.378,
+      "heal": 0.134,
+      "shield": 0.686,
+      "crit": 0,
+      "aa": 0,
+      "games": 5466
+    },
+    "Rakan": {
+      "ap": 0.764,
+      "tank": 0.558,
+      "cc": 0.756,
+      "heal": 0.61,
+      "shield": 0.953,
+      "crit": 0,
+      "aa": 0,
+      "games": 13429
+    },
+    "Tristana": {
+      "ap": 0.085,
+      "tank": 0.238,
+      "cc": 0.099,
+      "heal": 0.448,
+      "shield": 0.012,
+      "crit": 1,
+      "aa": 0.723,
+      "games": 13861
+    },
+    "Ivern": {
+      "ap": 0.704,
+      "tank": 0.07,
+      "cc": 0.948,
+      "heal": 0.483,
+      "shield": 1,
+      "crit": 0,
+      "aa": 0.016,
+      "games": 3708
+    },
+    "Locke": {
+      "ap": 0.945,
+      "tank": 0.494,
+      "cc": 0.238,
+      "heal": 0.82,
+      "shield": 0.192,
+      "crit": 0,
+      "aa": 0.005,
+      "games": 15831
+    },
+    "Thresh": {
+      "ap": 0.84,
+      "tank": 0.535,
+      "cc": 0.802,
+      "heal": 0.169,
+      "shield": 0.924,
+      "crit": 0,
+      "aa": 0,
+      "games": 24249
+    },
+    "Mordekaiser": {
+      "ap": 0.87,
+      "tank": 0.849,
+      "cc": 0.203,
+      "heal": 0.703,
+      "shield": 0.017,
+      "crit": 0,
+      "aa": 0.218,
+      "games": 5944
+    },
+    "Lucian": {
+      "ap": 0.103,
+      "tank": 0.326,
+      "cc": 0.023,
+      "heal": 0.39,
+      "shield": 0.023,
+      "crit": 1,
+      "aa": 0.383,
+      "games": 16807
+    },
+    "Mel": {
+      "ap": 0.928,
+      "tank": 0.134,
+      "cc": 0.692,
+      "heal": 0.058,
+      "shield": 0.826,
+      "crit": 0,
+      "aa": 0,
+      "games": 5472
+    },
+    "Lux": {
+      "ap": 0.933,
+      "tank": 0.047,
+      "cc": 0.878,
+      "heal": 0.029,
+      "shield": 0.936,
+      "crit": 0,
+      "aa": 0,
+      "games": 12081
+    },
+    "Kayle": {
+      "ap": 0.743,
+      "tank": 0.337,
+      "cc": 0.128,
+      "heal": 0.657,
+      "shield": 0.709,
+      "crit": 0.013,
+      "aa": 0.883,
+      "games": 5838
+    },
+    "Kindred": {
+      "ap": 0.152,
+      "tank": 0.459,
+      "cc": 0.221,
+      "heal": 0.872,
+      "shield": 0.238,
+      "crit": 0.864,
+      "aa": 0.541,
+      "games": 7345
+    },
+    "TwistedFate": {
+      "ap": 0.851,
+      "tank": 0.349,
+      "cc": 0.826,
+      "heal": 0.244,
+      "shield": 0.517,
+      "crit": 0.335,
+      "aa": 0.4,
+      "games": 13606
+    },
+    "Katarina": {
+      "ap": 0.754,
+      "tank": 0.477,
+      "cc": 0.006,
+      "heal": 0.337,
+      "shield": 0.337,
+      "crit": 0,
+      "aa": 0.489,
+      "games": 12313
+    },
+    "Yunara": {
+      "ap": 0.335,
+      "tank": 0.285,
+      "cc": 0.151,
+      "heal": 0.5,
+      "shield": 0.233,
+      "crit": 1,
+      "aa": 0.917,
+      "games": 25075
+    },
+    "Lulu": {
+      "ap": 0.832,
+      "tank": 0.035,
+      "cc": 0.715,
+      "heal": 0.18,
+      "shield": 0.971,
+      "crit": 0,
+      "aa": 0.001,
+      "games": 25020
+    },
+    "Ornn": {
+      "ap": 0.644,
+      "tank": 0.971,
+      "cc": 0.837,
+      "heal": 0.343,
+      "shield": 0.721,
+      "crit": 0,
+      "aa": 0,
+      "games": 8482
+    },
+    "Teemo": {
+      "ap": 0.83,
+      "tank": 0.308,
+      "cc": 0.843,
+      "heal": 0.186,
+      "shield": 0.442,
+      "crit": 0.006,
+      "aa": 0.482,
+      "games": 5451
+    },
+    "Naafiri": {
+      "ap": 0.02,
+      "tank": 0.547,
+      "cc": 0.087,
+      "heal": 0.791,
+      "shield": 0.279,
+      "crit": 0.014,
+      "aa": 0,
+      "games": 11000
+    },
+    "Caitlyn": {
+      "ap": 0.028,
+      "tank": 0.116,
+      "cc": 0.355,
+      "heal": 0.279,
+      "shield": 0.267,
+      "crit": 1,
+      "aa": 0.312,
+      "games": 13916
+    },
+    "Hecarim": {
+      "ap": 0.153,
+      "tank": 0.901,
+      "cc": 0.407,
+      "heal": 0.965,
+      "shield": 0.215,
+      "crit": 0.014,
+      "aa": 0.003,
+      "games": 13644
+    },
+    "Aphelios": {
+      "ap": 0.046,
+      "tank": 0.227,
+      "cc": 0.262,
+      "heal": 0.506,
+      "shield": 0.029,
+      "crit": 1,
+      "aa": 0.364,
+      "games": 15154
+    },
+    "Milio": {
+      "ap": 0.791,
+      "tank": 0.017,
+      "cc": 0.401,
+      "heal": 0.767,
+      "shield": 0.988,
+      "crit": 0,
+      "aa": 0,
+      "games": 8389
+    },
+    "Camille": {
+      "ap": 0.079,
+      "tank": 0.75,
+      "cc": 0.442,
+      "heal": 0.57,
+      "shield": 0.57,
+      "crit": 0,
+      "aa": 0.442,
+      "games": 14628
+    },
+    "Darius": {
+      "ap": 0.003,
+      "tank": 0.779,
+      "cc": 0.43,
+      "heal": 0.645,
+      "shield": 0.494,
+      "crit": 0.014,
+      "aa": 0.162,
+      "games": 12609
+    },
+    "Syndra": {
+      "ap": 0.958,
+      "tank": 0.064,
+      "cc": 0.82,
+      "heal": 0.023,
+      "shield": 0.395,
+      "crit": 0,
+      "aa": 0,
+      "games": 24371
+    },
+    "Yasuo": {
+      "ap": 0.089,
+      "tank": 0.628,
+      "cc": 0.483,
+      "heal": 0.413,
+      "shield": 0.366,
+      "crit": 0.897,
+      "aa": 0.222,
+      "games": 21104
+    },
+    "Sona": {
+      "ap": 0.773,
+      "tank": 0.198,
+      "cc": 0.331,
+      "heal": 0.93,
+      "shield": 0.965,
+      "crit": 0,
+      "aa": 0,
+      "games": 7118
+    },
+    "Blitzcrank": {
+      "ap": 0.656,
+      "tank": 0.523,
+      "cc": 0.919,
+      "heal": 0.128,
+      "shield": 0.837,
+      "crit": 0.001,
+      "aa": 0.001,
+      "games": 15319
+    },
+    "Renekton": {
+      "ap": 0.178,
+      "tank": 0.907,
+      "cc": 0.488,
+      "heal": 0.709,
+      "shield": 0.448,
+      "crit": 0.003,
+      "aa": 0.105,
+      "games": 12175
+    },
+    "Olaf": {
+      "ap": 0.005,
+      "tank": 0.837,
+      "cc": 0.256,
+      "heal": 0.895,
+      "shield": 0.035,
+      "crit": 0.113,
+      "aa": 0.689,
+      "games": 10347
+    },
+    "Varus": {
+      "ap": 0.387,
+      "tank": 0.203,
+      "cc": 0.523,
+      "heal": 0.174,
+      "shield": 0.547,
+      "crit": 0.04,
+      "aa": 0.845,
+      "games": 8928
+    },
+    "Jinx": {
+      "ap": 0.031,
+      "tank": 0.105,
+      "cc": 0.337,
+      "heal": 0.256,
+      "shield": 0.041,
+      "crit": 1,
+      "aa": 0.584,
+      "games": 15042
+    },
+    "Braum": {
+      "ap": 0.804,
+      "tank": 0.616,
+      "cc": 0.855,
+      "heal": 0.314,
+      "shield": 0.907,
+      "crit": 0,
+      "aa": 0.001,
+      "games": 10674
+    },
+    "Tryndamere": {
+      "ap": 0.009,
+      "tank": 0.872,
+      "cc": 0.308,
+      "heal": 0.919,
+      "shield": 0.047,
+      "crit": 0.622,
+      "aa": 0.458,
+      "games": 5860
+    },
+    "Lillia": {
+      "ap": 0.948,
+      "tank": 0.698,
+      "cc": 0.605,
+      "heal": 0.953,
+      "shield": 0.18,
+      "crit": 0,
+      "aa": 0,
+      "games": 8393
+    },
+    "Ahri": {
+      "ap": 0.902,
+      "tank": 0.215,
+      "cc": 0.372,
+      "heal": 0.494,
+      "shield": 0.471,
+      "crit": 0,
+      "aa": 0,
+      "games": 19309
+    },
+    "Malzahar": {
+      "ap": 0.974,
+      "tank": 0.174,
+      "cc": 0.971,
+      "heal": 0.006,
+      "shield": 0.529,
+      "crit": 0,
+      "aa": 0,
+      "games": 5383
+    },
+    "Viktor": {
+      "ap": 0.974,
+      "tank": 0.36,
+      "cc": 0.512,
+      "heal": 0.017,
+      "shield": 0.308,
+      "crit": 0,
+      "aa": 0,
+      "games": 17399
+    },
+    "Quinn": {
+      "ap": 0.008,
+      "tank": 0.366,
+      "cc": 0.599,
+      "heal": 0.401,
+      "shield": 0.512,
+      "crit": 0.787,
+      "aa": 0.126,
+      "games": 3805
+    },
+    "Rell": {
+      "ap": 0.763,
+      "tank": 0.663,
+      "cc": 0.884,
+      "heal": 0.157,
+      "shield": 0.808,
+      "crit": 0,
+      "aa": 0,
+      "games": 12864
+    },
+    "Jayce": {
+      "ap": 0.174,
+      "tank": 0.43,
+      "cc": 0.267,
+      "heal": 0.285,
+      "shield": 0.326,
+      "crit": 0.098,
+      "aa": 0,
+      "games": 25567
+    },
+    "Alistar": {
+      "ap": 0.846,
+      "tank": 0.785,
+      "cc": 0.977,
+      "heal": 0.762,
+      "shield": 0.802,
+      "crit": 0,
+      "aa": 0,
+      "games": 20442
+    },
+    "Evelynn": {
+      "ap": 0.968,
+      "tank": 0.453,
+      "cc": 0.279,
+      "heal": 0.727,
+      "shield": 0.052,
+      "crit": 0,
+      "aa": 0.001,
+      "games": 4636
+    },
+    "Vex": {
+      "ap": 0.926,
+      "tank": 0.25,
+      "cc": 0.68,
+      "heal": 0.064,
+      "shield": 0.058,
+      "crit": 0,
+      "aa": 0,
+      "games": 4771
+    },
+    "Sion": {
+      "ap": 0.367,
+      "tank": 1,
+      "cc": 0.849,
+      "heal": 0.68,
+      "shield": 0.698,
+      "crit": 0.036,
+      "aa": 0.002,
+      "games": 10938
+    },
+    "Rengar": {
+      "ap": 0.057,
+      "tank": 0.57,
+      "cc": 0.297,
+      "heal": 0.884,
+      "shield": 0.657,
+      "crit": 0.373,
+      "aa": 0.014,
+      "games": 9617
+    },
+    "Ambessa": {
+      "ap": 0.019,
+      "tank": 0.808,
+      "cc": 0.215,
+      "heal": 0.581,
+      "shield": 0.064,
+      "crit": 0.021,
+      "aa": 0,
+      "games": 15986
+    },
+    "Riven": {
+      "ap": 0.002,
+      "tank": 0.756,
+      "cc": 0.663,
+      "heal": 0.517,
+      "shield": 0.419,
+      "crit": 0.087,
+      "aa": 0.001,
+      "games": 6399
+    },
+    "Skarner": {
+      "ap": 0.309,
+      "tank": 0.983,
+      "cc": 0.872,
+      "heal": 0.663,
+      "shield": 0.727,
+      "crit": 0.002,
+      "aa": 0.018,
+      "games": 3814
+    },
+    "Pyke": {
+      "ap": 0.003,
+      "tank": 0.267,
+      "cc": 0.593,
+      "heal": 0.308,
+      "shield": 0.703,
+      "crit": 0.001,
+      "aa": 0,
+      "games": 10519
+    },
+    "Akali": {
+      "ap": 0.932,
+      "tank": 0.488,
+      "cc": 0.029,
+      "heal": 0.465,
+      "shield": 0.25,
+      "crit": 0,
+      "aa": 0,
+      "games": 21097
+    },
+    "Briar": {
+      "ap": 0.1,
+      "tank": 0.82,
+      "cc": 0.61,
+      "heal": 0.994,
+      "shield": 0.07,
+      "crit": 0.397,
+      "aa": 0.067,
+      "games": 4059
+    },
+    "Heimerdinger": {
+      "ap": 0.956,
+      "tank": 0.076,
+      "cc": 0.453,
+      "heal": 0.052,
+      "shield": 0.407,
+      "crit": 0,
+      "aa": 0,
+      "games": 3257
+    },
+    "Qiyana": {
+      "ap": 0.084,
+      "tank": 0.442,
+      "cc": 0.419,
+      "heal": 0.558,
+      "shield": 0.163,
+      "crit": 0.133,
+      "aa": 0,
+      "games": 23072
+    },
+    "Vladimir": {
+      "ap": 0.961,
+      "tank": 0.576,
+      "cc": 0.052,
+      "heal": 0.988,
+      "shield": 0.314,
+      "crit": 0,
+      "aa": 0,
+      "games": 9803
+    },
+    "MonkeyKing": {
+      "ap": 0.14,
+      "tank": 0.703,
+      "cc": 0.384,
+      "heal": 0.605,
+      "shield": 0.36,
+      "crit": 0.008,
+      "aa": 0.462,
+      "games": 12281
+    },
+    "Aurora": {
+      "ap": 0.93,
+      "tank": 0.192,
+      "cc": 0.122,
+      "heal": 0.25,
+      "shield": 0.157,
+      "crit": 0,
+      "aa": 0,
+      "games": 8970
+    },
+    "Poppy": {
+      "ap": 0.164,
+      "tank": 0.814,
+      "cc": 0.831,
+      "heal": 0.302,
+      "shield": 0.791,
+      "crit": 0.001,
+      "aa": 0.008,
+      "games": 7068
+    },
+    "Taliyah": {
+      "ap": 0.959,
+      "tank": 0.128,
+      "cc": 0.738,
+      "heal": 0.215,
+      "shield": 0.558,
+      "crit": 0,
+      "aa": 0,
+      "games": 18939
+    },
+    "Sivir": {
+      "ap": 0.008,
+      "tank": 0.18,
+      "cc": 0,
+      "heal": 0.424,
+      "shield": 0.262,
+      "crit": 1,
+      "aa": 0.757,
+      "games": 7466
+    },
+    "Soraka": {
+      "ap": 0.851,
+      "tank": 0.012,
+      "cc": 0.75,
+      "heal": 0.983,
+      "shield": 0.89,
+      "crit": 0,
+      "aa": 0,
+      "games": 7627
+    },
+    "Illaoi": {
+      "ap": 0.028,
+      "tank": 0.924,
+      "cc": 0.081,
+      "heal": 0.75,
+      "shield": 0.076,
+      "crit": 0.007,
+      "aa": 0.029,
+      "games": 3176
+    },
+    "Elise": {
+      "ap": 0.908,
+      "tank": 0.39,
+      "cc": 0.616,
+      "heal": 0.669,
+      "shield": 0.744,
+      "crit": 0,
+      "aa": 0.009,
+      "games": 10064
+    },
+    "Zoe": {
+      "ap": 0.898,
+      "tank": 0.058,
+      "cc": 0.808,
+      "heal": 0.087,
+      "shield": 0.779,
+      "crit": 0,
+      "aa": 0.001,
+      "games": 9171
+    },
+    "Shen": {
+      "ap": 0.445,
+      "tank": 0.86,
+      "cc": 0.698,
+      "heal": 0.32,
+      "shield": 0.93,
+      "crit": 0.003,
+      "aa": 0.167,
+      "games": 9175
+    },
+    "Yone": {
+      "ap": 0.181,
+      "tank": 0.669,
+      "cc": 0.424,
+      "heal": 0.541,
+      "shield": 0.081,
+      "crit": 0.822,
+      "aa": 0.251,
+      "games": 29155
+    },
+    "MasterYi": {
+      "ap": 0.033,
+      "tank": 0.564,
+      "cc": 0.07,
+      "heal": 0.64,
+      "shield": 0.087,
+      "crit": 0.5,
+      "aa": 0.846,
+      "games": 8704
+    },
+    "Orianna": {
+      "ap": 0.944,
+      "tank": 0.209,
+      "cc": 0.506,
+      "heal": 0.076,
+      "shield": 0.913,
+      "crit": 0,
+      "aa": 0,
+      "games": 13610
+    },
+    "XinZhao": {
+      "ap": 0.074,
+      "tank": 0.843,
+      "cc": 0.529,
+      "heal": 0.959,
+      "shield": 0.302,
+      "crit": 0.041,
+      "aa": 0.073,
+      "games": 7873
+    },
+    "Akshan": {
+      "ap": 0.086,
+      "tank": 0.355,
+      "cc": 0.012,
+      "heal": 0.221,
+      "shield": 0.093,
+      "crit": 1,
+      "aa": 0.226,
+      "games": 6566
+    },
+    "Ziggs": {
+      "ap": 0.962,
+      "tank": 0.023,
+      "cc": 0.314,
+      "heal": 0,
+      "shield": 0.169,
+      "crit": 0,
+      "aa": 0,
+      "games": 4043
+    },
+    "Gragas": {
+      "ap": 0.92,
+      "tank": 0.634,
+      "cc": 0.901,
+      "heal": 0.756,
+      "shield": 0.692,
+      "crit": 0,
+      "aa": 0,
+      "games": 7870
+    },
+    "Irelia": {
+      "ap": 0.247,
+      "tank": 0.791,
+      "cc": 0.291,
+      "heal": 0.814,
+      "shield": 0.198,
+      "crit": 0.003,
+      "aa": 0.844,
+      "games": 13920
+    },
+    "Zeri": {
+      "ap": 0.224,
+      "tank": 0.343,
+      "cc": 0.076,
+      "heal": 0.459,
+      "shield": 0.273,
+      "crit": 1,
+      "aa": 0.932,
+      "games": 12718
+    },
+    "Pantheon": {
+      "ap": 0.043,
+      "tank": 0.512,
+      "cc": 0.471,
+      "heal": 0.291,
+      "shield": 0.593,
+      "crit": 0.047,
+      "aa": 0.007,
+      "games": 19130
+    },
+    "Gnar": {
+      "ap": 0.168,
+      "tank": 0.651,
+      "cc": 0.721,
+      "heal": 0.366,
+      "shield": 0.465,
+      "crit": 0.002,
+      "aa": 0.559,
+      "games": 8606
+    },
+    "Zed": {
+      "ap": 0.037,
+      "tank": 0.378,
+      "cc": 0.093,
+      "heal": 0.262,
+      "shield": 0.099,
+      "crit": 0.168,
+      "aa": 0,
+      "games": 17751
+    },
+    "DrMundo": {
+      "ap": 0.542,
+      "tank": 0.994,
+      "cc": 0.273,
+      "heal": 0.948,
+      "shield": 0.599,
+      "crit": 0.001,
+      "aa": 0.001,
+      "games": 8027
+    },
+    "Zilean": {
+      "ap": 0.836,
+      "tank": 0.122,
+      "cc": 0.564,
+      "heal": 0.593,
+      "shield": 0.872,
+      "crit": 0,
+      "aa": 0,
+      "games": 7076
+    },
+    "Gangplank": {
+      "ap": 0.211,
+      "tank": 0.471,
+      "cc": 0.227,
+      "heal": 0.564,
+      "shield": 0.105,
+      "crit": 1,
+      "aa": 0.018,
+      "games": 9675
+    },
+    "Kayn": {
+      "ap": 0.063,
+      "tank": 0.622,
+      "cc": 0.25,
+      "heal": 0.866,
+      "shield": 0.11,
+      "crit": 0.117,
+      "aa": 0,
+      "games": 7079
+    },
+    "Garen": {
+      "ap": 0.003,
+      "tank": 0.878,
+      "cc": 0.744,
+      "heal": 0.081,
+      "shield": 0.32,
+      "crit": 0.436,
+      "aa": 0.71,
+      "games": 8277
+    },
+    "Kassadin": {
+      "ap": 0.911,
+      "tank": 0.593,
+      "cc": 0.058,
+      "heal": 0.436,
+      "shield": 0.116,
+      "crit": 0,
+      "aa": 0,
+      "games": 5937
+    },
+    "Senna": {
+      "ap": 0.089,
+      "tank": 0.145,
+      "cc": 0.785,
+      "heal": 0.826,
+      "shield": 0.895,
+      "crit": 0.268,
+      "aa": 0.381,
+      "games": 11116
+    },
+    "Karthus": {
+      "ap": 0.99,
+      "tank": 0.407,
+      "cc": 0.39,
+      "heal": 0.395,
+      "shield": 0.291,
+      "crit": 0,
+      "aa": 0,
+      "games": 6377
+    },
+    "Anivia": {
+      "ap": 0.92,
+      "tank": 0.517,
+      "cc": 0.924,
+      "heal": 0.326,
+      "shield": 0.669,
+      "crit": 0,
+      "aa": 0,
+      "games": 8725
+    },
+    "Amumu": {
+      "ap": 0.876,
+      "tank": 0.605,
+      "cc": 0.866,
+      "heal": 0.36,
+      "shield": 0.785,
+      "crit": 0,
+      "aa": 0,
+      "games": 2695
+    },
+    "Yuumi": {
+      "ap": 0.949,
+      "tank": 0,
+      "cc": 0.413,
+      "heal": 0.628,
+      "shield": 0.994,
+      "crit": 0,
+      "aa": 0,
+      "games": 8613
+    },
+    "Talon": {
+      "ap": 0.002,
+      "tank": 0.552,
+      "cc": 0.064,
+      "heal": 0.744,
+      "shield": 0.39,
+      "crit": 0.137,
+      "aa": 0.001,
+      "games": 17529
+    },
+    "Morgana": {
+      "ap": 0.929,
+      "tank": 0.291,
+      "cc": 0.965,
+      "heal": 0.477,
+      "shield": 0.884,
+      "crit": 0,
+      "aa": 0,
+      "games": 4992
+    },
+    "Nasus": {
+      "ap": 0.251,
+      "tank": 0.959,
+      "cc": 0.395,
+      "heal": 0.86,
+      "shield": 0.64,
+      "crit": 0.066,
+      "aa": 0.339,
+      "games": 5525
+    },
+    "Brand": {
+      "ap": 0.959,
+      "tank": 0.262,
+      "cc": 0.773,
+      "heal": 0.099,
+      "shield": 0.43,
+      "crit": 0.001,
+      "aa": 0,
+      "games": 3793
+    },
+    "Neeko": {
+      "ap": 0.908,
+      "tank": 0.186,
+      "cc": 0.895,
+      "heal": 0.145,
+      "shield": 0.674,
+      "crit": 0.001,
+      "aa": 0.023,
+      "games": 5682
+    },
+    "Seraphine": {
+      "ap": 0.875,
+      "tank": 0.081,
+      "cc": 0.674,
+      "heal": 0.634,
+      "shield": 0.942,
+      "crit": 0,
+      "aa": 0,
+      "games": 10764
+    },
+    "Diana": {
+      "ap": 0.888,
+      "tank": 0.68,
+      "cc": 0.169,
+      "heal": 0.378,
+      "shield": 0.453,
+      "crit": 0,
+      "aa": 0.237,
+      "games": 10155
+    },
+    "Maokai": {
+      "ap": 0.881,
+      "tank": 0.738,
+      "cc": 0.988,
+      "heal": 0.721,
+      "shield": 0.797,
+      "crit": 0,
+      "aa": 0,
+      "games": 6574
+    },
+    "Swain": {
+      "ap": 0.924,
+      "tank": 0.645,
+      "cc": 0.936,
+      "heal": 0.785,
+      "shield": 0.68,
+      "crit": 0,
+      "aa": 0,
+      "games": 8570
+    },
+    "Nilah": {
+      "ap": 0.005,
+      "tank": 0.483,
+      "cc": 0.14,
+      "heal": 0.576,
+      "shield": 0.814,
+      "crit": 1,
+      "aa": 0.187,
+      "games": 1660
+    },
+    "Zyra": {
+      "ap": 0.946,
+      "tank": 0.099,
+      "cc": 0.86,
+      "heal": 0.273,
+      "shield": 0.628,
+      "crit": 0,
+      "aa": 0,
+      "games": 9425
+    },
+    "Renata": {
+      "ap": 0.751,
+      "tank": 0.424,
+      "cc": 0.628,
+      "heal": 0.192,
+      "shield": 0.959,
+      "crit": 0,
+      "aa": 0,
+      "games": 5815
+    },
+    "Shaco": {
+      "ap": 0.676,
+      "tank": 0.256,
+      "cc": 0.634,
+      "heal": 0.529,
+      "shield": 0.5,
+      "crit": 0.22,
+      "aa": 0.021,
+      "games": 8069
+    },
+    "Aatrox": {
+      "ap": 0.083,
+      "tank": 0.826,
+      "cc": 0.448,
+      "heal": 0.878,
+      "shield": 0.477,
+      "crit": 0.019,
+      "aa": 0.009,
+      "games": 12000
+    },
+    "Taric": {
+      "ap": 0.648,
+      "tank": 0.61,
+      "cc": 0.797,
+      "heal": 0.901,
+      "shield": 0.948,
+      "crit": 0,
+      "aa": 0.001,
+      "games": 3010
+    },
+    "Nidalee": {
+      "ap": 0.911,
+      "tank": 0.529,
+      "cc": 0.157,
+      "heal": 0.971,
+      "shield": 0.75,
+      "crit": 0,
+      "aa": 0.008,
+      "games": 10100
+    },
+    "Kennen": {
+      "ap": 0.849,
+      "tank": 0.395,
+      "cc": 0.558,
+      "heal": 0.267,
+      "shield": 0.587,
+      "crit": 0.017,
+      "aa": 0.03,
+      "games": 5924
+    },
+    "Fizz": {
+      "ap": 0.858,
+      "tank": 0.384,
+      "cc": 0.233,
+      "heal": 0.238,
+      "shield": 0.122,
+      "crit": 0,
+      "aa": 0.145,
+      "games": 6635
+    },
+    "Sett": {
+      "ap": 0.005,
+      "tank": 0.866,
+      "cc": 0.581,
+      "heal": 0.355,
+      "shield": 0.61,
+      "crit": 0.002,
+      "aa": 0.486,
+      "games": 5734
+    },
+    "Malphite": {
+      "ap": 0.714,
+      "tank": 0.919,
+      "cc": 0.703,
+      "heal": 0.151,
+      "shield": 0.605,
+      "crit": 0.001,
+      "aa": 0.023,
+      "games": 13123
+    },
+    "RekSai": {
+      "ap": 0.203,
+      "tank": 0.797,
+      "cc": 0.651,
+      "heal": 0.977,
+      "shield": 0.634,
+      "crit": 0.056,
+      "aa": 0.221,
+      "games": 5203
+    },
+    "Corki": {
+      "ap": 0.215,
+      "tank": 0.314,
+      "cc": 0.017,
+      "heal": 0.227,
+      "shield": 0.378,
+      "crit": 1,
+      "aa": 0.24,
+      "games": 14893
+    },
+    "Vi": {
+      "ap": 0.002,
+      "tank": 0.733,
+      "cc": 0.622,
+      "heal": 0.599,
+      "shield": 0.372,
+      "crit": 0.104,
+      "aa": 0.403,
+      "games": 9177
+    },
+    "Velkoz": {
+      "ap": 0.968,
+      "tank": 0.041,
+      "cc": 0.576,
+      "heal": 0.047,
+      "shield": 0.576,
+      "crit": 0,
+      "aa": 0,
+      "games": 9780
+    },
+    "Vayne": {
+      "ap": 0.044,
+      "tank": 0.372,
+      "cc": 0.163,
+      "heal": 0.407,
+      "shield": 0.128,
+      "crit": 0.507,
+      "aa": 1,
+      "games": 6264
+    },
+    "Ashe": {
+      "ap": 0.09,
+      "tank": 0.093,
+      "cc": 0.913,
+      "heal": 0.105,
+      "shield": 0.483,
+      "crit": 1,
+      "aa": 0.584,
+      "games": 8558
+    },
+    "Udyr": {
+      "ap": 0.492,
+      "tank": 0.936,
+      "cc": 0.709,
+      "heal": 0.773,
+      "shield": 0.581,
+      "crit": 0.026,
+      "aa": 0.148,
+      "games": 4935
+    },
+    "Sejuani": {
+      "ap": 0.38,
+      "tank": 0.965,
+      "cc": 0.727,
+      "heal": 0.715,
+      "shield": 0.733,
+      "crit": 0,
+      "aa": 0.039,
+      "games": 3283
+    },
+    "Nocturne": {
+      "ap": 0.064,
+      "tank": 0.64,
+      "cc": 1,
+      "heal": 0.849,
+      "shield": 0.134,
+      "crit": 0.065,
+      "aa": 0.603,
+      "games": 4687
+    },
+    "KSante": {
+      "ap": 0.084,
+      "tank": 0.988,
+      "cc": 0.791,
+      "heal": 0.471,
+      "shield": 0.866,
+      "crit": 0.001,
+      "aa": 0,
+      "games": 12518
+    },
+    "Kalista": {
+      "ap": 0.185,
+      "tank": 0.419,
+      "cc": 0.326,
+      "heal": 0.442,
+      "shield": 0.355,
+      "crit": 0.013,
+      "aa": 1,
+      "games": 12913
+    },
+    "Azir": {
+      "ap": 0.973,
+      "tank": 0.331,
+      "cc": 0.209,
+      "heal": 0.07,
+      "shield": 0.343,
+      "crit": 0,
+      "aa": 0.497,
+      "games": 3849
+    },
+    "Bard": {
+      "ap": 0.655,
+      "tank": 0.413,
+      "cc": 0.93,
+      "heal": 0.535,
+      "shield": 0.82,
+      "crit": 0.001,
+      "aa": 0.002,
+      "games": 12465
+    },
+    "AurelionSol": {
+      "ap": 0.99,
+      "tank": 0.221,
+      "cc": 0.517,
+      "heal": 0.093,
+      "shield": 0.459,
+      "crit": 0,
+      "aa": 0,
+      "games": 6139
+    },
+    "MissFortune": {
+      "ap": 0.062,
+      "tank": 0.244,
+      "cc": 0.116,
+      "heal": 0.331,
+      "shield": 0.221,
+      "crit": 1,
+      "aa": 0.054,
+      "games": 10889
+    },
+    "Cassiopeia": {
+      "ap": 0.979,
+      "tank": 0.448,
+      "cc": 0.64,
+      "heal": 0.547,
+      "shield": 0.14,
+      "crit": 0,
+      "aa": 0,
+      "games": 7566
+    },
+    "Fiddlesticks": {
+      "ap": 0.982,
+      "tank": 0.506,
+      "cc": 0.959,
+      "heal": 0.808,
+      "shield": 0.715,
+      "crit": 0,
+      "aa": 0,
+      "games": 4603
+    },
+    "Smolder": {
+      "ap": 0.222,
+      "tank": 0.297,
+      "cc": 0.198,
+      "heal": 0.349,
+      "shield": 0.413,
+      "crit": 1,
+      "aa": 0.249,
+      "games": 5724
+    },
+    "Belveth": {
+      "ap": 0.113,
+      "tank": 0.721,
+      "cc": 0.366,
+      "heal": 0.89,
+      "shield": 0.227,
+      "crit": 0.096,
+      "aa": 1,
+      "games": 5568
+    },
+    "Twitch": {
+      "ap": 0.082,
+      "tank": 0.14,
+      "cc": 0.11,
+      "heal": 0.14,
+      "shield": 0.186,
+      "crit": 1,
+      "aa": 0.632,
+      "games": 7268
+    },
+    "Rammus": {
+      "ap": 0.672,
+      "tank": 0.977,
+      "cc": 0.89,
+      "heal": 0.692,
+      "shield": 0.651,
+      "crit": 0.003,
+      "aa": 0.004,
+      "games": 1841
+    },
+    "Shyvana": {
+      "ap": 0.457,
+      "tank": 0.89,
+      "cc": 0.244,
+      "heal": 0.686,
+      "shield": 0.436,
+      "crit": 0.002,
+      "aa": 0.628,
+      "games": 4971
+    },
+    "Gwen": {
+      "ap": 0.845,
+      "tank": 0.692,
+      "cc": 0.105,
+      "heal": 0.738,
+      "shield": 0.145,
+      "crit": 0,
+      "aa": 0.478,
+      "games": 7709
+    },
+    "Warwick": {
+      "ap": 0.504,
+      "tank": 0.884,
+      "cc": 0.57,
+      "heal": 0.942,
+      "shield": 0.488,
+      "crit": 0.016,
+      "aa": 0.787,
+      "games": 4677
+    },
+    "Volibear": {
+      "ap": 0.461,
+      "tank": 0.895,
+      "cc": 0.552,
+      "heal": 0.651,
+      "shield": 0.523,
+      "crit": 0.153,
+      "aa": 0.626,
+      "games": 5537
+    },
+    "Samira": {
+      "ap": 0.104,
+      "tank": 0.436,
+      "cc": 0.047,
+      "heal": 0.616,
+      "shield": 0.384,
+      "crit": 1,
+      "aa": 0.001,
+      "games": 3449
+    },
+    "TahmKench": {
+      "ap": 0.794,
+      "tank": 0.953,
+      "cc": 0.733,
+      "heal": 0.831,
+      "shield": 0.855,
+      "crit": 0,
+      "aa": 0.155,
+      "games": 4482
+    },
+    "KogMaw": {
+      "ap": 0.763,
+      "tank": 0.302,
+      "cc": 0.18,
+      "heal": 0.209,
+      "shield": 0.151,
+      "crit": 0.178,
+      "aa": 0.885,
+      "games": 6880
+    },
+    "Singed": {
+      "ap": 0.95,
+      "tank": 0.744,
+      "cc": 0.779,
+      "heal": 0.372,
+      "shield": 0.622,
+      "crit": 0,
+      "aa": 0,
+      "games": 5916
+    },
+    "Kled": {
+      "ap": 0.065,
+      "tank": 0.93,
+      "cc": 0.192,
+      "heal": 0.552,
+      "shield": 0.506,
+      "crit": 0.09,
+      "aa": 0.03,
+      "games": 4030
+    },
+    "Annie": {
+      "ap": 0.952,
+      "tank": 0.151,
+      "cc": 0.669,
+      "heal": 0.035,
+      "shield": 0.919,
+      "crit": 0,
+      "aa": 0,
+      "games": 3925
+    },
+    "Yorick": {
+      "ap": 0.314,
+      "tank": 0.686,
+      "cc": 0.134,
+      "heal": 0.698,
+      "shield": 0.645,
+      "crit": 0.009,
+      "aa": 0.33,
+      "games": 3493
+    }
+  },
+  "junglers": {
+    "Blitzcrank": {
+      "games": 24,
+      "winRate": 0.5,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Lucian": {
+      "games": 28,
+      "winRate": 0.607,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Veigar": {
+      "games": 25,
+      "winRate": 0.52,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Ahri": {
+      "games": 33,
+      "winRate": 0.515,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Senna": {
+      "games": 20,
+      "winRate": 0.55,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Leblanc": {
+      "games": 23,
+      "winRate": 0.522,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Ashe": {
+      "games": 35,
+      "winRate": 0.371,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Seraphine": {
+      "games": 28,
+      "winRate": 0.464,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Malzahar": {
+      "games": 25,
+      "winRate": 0.64,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "MissFortune": {
+      "games": 23,
+      "winRate": 0.304,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Varus": {
+      "games": 28,
+      "winRate": 0.536,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Teemo": {
+      "games": 23,
+      "winRate": 0.478,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Ezreal": {
+      "games": 26,
+      "winRate": 0.692,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Swain": {
+      "games": 22,
+      "winRate": 0.409,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Lux": {
+      "games": 25,
+      "winRate": 0.68,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Kaisa": {
+      "games": 23,
+      "winRate": 0.696,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Jinx": {
+      "games": 28,
+      "winRate": 0.571,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Mordekaiser": {
+      "games": 21,
+      "winRate": 0.619,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Orianna": {
+      "games": 20,
+      "winRate": 0.55,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Nautilus": {
+      "games": 21,
+      "winRate": 0.667,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Yone": {
+      "games": 24,
+      "winRate": 0.5,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Brand": {
+      "games": 23,
+      "winRate": 0.522,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Nidalee": {
+      "games": 20,
+      "winRate": 0.65,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Jhin": {
+      "games": 23,
+      "winRate": 0.652,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    },
+    "Xayah": {
+      "games": 20,
+      "winRate": 0.55,
+      "vs": {},
+      "with": {},
+      "against": {},
+      "banRate": 0
+    }
+  },
+  "priors": {
+    "vs": 1000,
+    "with": 20000,
+    "against": 20000,
+    "comp": 1500,
+    "fam": 5000,
+    "famCtx": 5000,
+    "runes": 2000,
+    "keystone": 4000,
+    "boots": 2000,
+    "skills": 4000,
+    "start": 5000,
+    "pet": 10000,
+    "c1": 4000,
+    "c2": 3000,
+    "c3": 1000,
+    "slot": 1000,
+    "choiceCtx": 3000,
+    "pair": 20000,
+    "slope": {
+      "item": 0,
+      "skills": 0,
+      "start": 0
+    },
+    "noise": 1
+  },
+  "threats": {
+    "Lucian": [
+      140,
+      0.607,
+      0
+    ],
+    "Veigar": [
+      125,
+      0.52,
+      0
+    ],
+    "Blitzcrank": [
+      120,
+      0.5,
+      0
+    ],
+    "Leblanc": [
+      115,
+      0.522,
+      0
+    ],
+    "Ashe": [
+      175,
+      0.371,
+      0
+    ],
+    "Ahri": [
+      165,
+      0.515,
+      0
+    ],
+    "Senna": [
+      100,
+      0.55,
+      0
+    ],
+    "MissFortune": [
+      115,
+      0.304,
+      0
+    ],
+    "Varus": [
+      140,
+      0.536,
+      0
+    ],
+    "Seraphine": [
+      140,
+      0.464,
+      0
+    ],
+    "Malzahar": [
+      125,
+      0.64,
+      0
+    ],
+    "Teemo": [
+      115,
+      0.478,
+      0
+    ],
+    "Swain": [
+      110,
+      0.409,
+      0
+    ],
+    "Ezreal": [
+      130,
+      0.692,
+      0
+    ],
+    "Lux": [
+      125,
+      0.68,
+      0
+    ],
+    "Jinx": [
+      140,
+      0.571,
+      0
+    ],
+    "Kaisa": [
+      115,
+      0.696,
+      0
+    ],
+    "Mordekaiser": [
+      105,
+      0.619,
+      0
+    ],
+    "Orianna": [
+      100,
+      0.55,
+      0
+    ],
+    "Nautilus": [
+      105,
+      0.667,
+      0
+    ],
+    "Yone": [
+      120,
+      0.5,
+      0
+    ],
+    "Brand": [
+      115,
+      0.522,
+      0
+    ],
+    "Nidalee": [
+      100,
+      0.65,
+      0
+    ],
+    "Jhin": [
+      115,
+      0.652,
+      0
+    ],
+    "Xayah": [
+      100,
+      0.55,
+      0
+    ]
+  },
+  "itemCounters": {},
+  "backtest": null,
+  "tuning": null,
+  "benchmarks": {
+    "Ahri": {
+      "games": 33,
+      "cs10": 23.242,
+      "cs15": 36.143,
+      "gold15": 10146.821,
+      "level15": 14.929,
+      "firstItem": 5.073,
+      "secondItem": 10.277,
+      "kp": 0.619,
+      "visionPerMin": 0,
+      "controlWardsPer10": 0,
+      "goldPerMin": 675.966,
+      "dmgPerMin": 1098.593,
+      "deathsPer10": 5.154,
+      "dmgShare": 0.163
+    },
+    "Ashe": {
+      "games": 35,
+      "cs10": 25.714,
+      "cs15": 42.29,
+      "gold15": 10649.419,
+      "level15": 14.71,
+      "firstItem": 5.015,
+      "secondItem": 10.205,
+      "kp": 0.642,
+      "visionPerMin": 0.171,
+      "controlWardsPer10": 0,
+      "goldPerMin": 696.715,
+      "dmgPerMin": 1461.873,
+      "deathsPer10": 5.592,
+      "dmgShare": 0.218
+    },
+    "_all": {
+      "games": 2010,
+      "cs10": 19.806,
+      "cs15": 31.781,
+      "gold15": 10742.603,
+      "level15": 15.001,
+      "firstItem": 4.797,
+      "secondItem": 9.891,
+      "kp": 0.664,
+      "visionPerMin": 0.004,
+      "controlWardsPer10": 0,
+      "goldPerMin": 710.345,
+      "dmgPerMin": 1393.478,
+      "deathsPer10": 5.624,
+      "dmgShare": 0.2
+    }
+  },
+  "features": {
+    "runes": true,
+    "augments": false
+  },
+  "bracket": "all",
+  "role": "aram",
+  "contexts": "composition"
+}
