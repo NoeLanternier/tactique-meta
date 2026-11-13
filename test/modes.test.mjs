@@ -170,3 +170,32 @@ test('part des requêtes des modes limitée tant que le classé collecte', async
   // Classé terminé : les modes passent sans attendre.
   assert.equal(riot.stats.lanes.mode, 60)
 })
+
+test('ARAM Mayhem : objets qui vont avec un augment, augments qui vont ensemble', async () => {
+  const { augmentItemStats, augmentPairStats } = await import('../src/aggregate.mjs')
+  // 20 champions : Rabadon acheté par 20 % des joueurs, mais par 60 % de ceux qui prennent 1205.
+  const champs = {}
+  for (let i = 0; i < 20; i++)
+    champs[`C${i}`] = {
+      g: 1000, w: 500,
+      aug: { 1205: [200, 100], 77: [200, 100] },
+      ctxItems: { all: { 3089: [200, 100], 3157: [300, 150] } }
+    }
+  const state = {
+    champs,
+    itemAll: { 3089: [4000, 2000], 3157: [6000, 3000] },
+    // Avec 1205 : Rabadon 2 400 fois sur 4 000 et gagne 58 % ; Zhonya comme d'habitude.
+    augItem: { 1205: { 3089: [2400, 1392], 3157: [1200, 600] }, 77: { 3089: [800, 400] } },
+    augPair: { '1205|77': [800, 520], '1205|99': [800, 400] }
+  }
+  const items = augmentItemStats(state, dd)
+  assert.equal(items['1205'][0].id, 3089)
+  assert.ok(Math.abs(items['1205'][0].uplift - 0.4) < 1e-9)
+  assert.ok(items['1205'][0].lift > 0.02)
+  // Zhonya : pas plus acheté avec 1205 que d'habitude, donc absent ; 77 : rien de particulier.
+  assert.ok(!items['1205'].some((x) => x.id === 3157))
+  assert.equal(items['77'], undefined)
+  const pairs = augmentPairStats(state, { 1205: { lift: 0 }, 77: { lift: 0 }, 99: { lift: 0 } })
+  assert.ok(pairs['1205|77'][1] > 0.01) // +15 points observés, lissés (peu de paires mesurées)
+  assert.equal(pairs['1205|99'], undefined)
+})

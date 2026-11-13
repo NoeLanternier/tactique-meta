@@ -270,7 +270,21 @@ export function addRecord(state, rec) {
     cell[1] += v
   }
   // Augments (ARAM Mayhem) et usage réel des runes et augments dans les modes.
-  for (const id of new Set(rec.augments ?? [])) inc(c.aug, String(id), rec.win)
+  const augs = [...new Set(rec.augments ?? [])].map(String)
+  for (const id of augs) inc(c.aug, id, rec.win)
+  if (augs.length) {
+    // Tous champions confondus : objets achetés avec chaque augment, et augments pris ensemble.
+    state.augItem ??= {}
+    state.augPair ??= {}
+    for (const a of augs) {
+      const row = (state.augItem[a] ??= {})
+      for (const id of rec.items ?? []) inc(row, String(id), rec.win)
+    }
+    const sorted = [...augs].sort()
+    for (let i = 0; i < sorted.length; i++)
+      for (let j = i + 1; j < sorted.length; j++)
+        inc(state.augPair, `${sorted[i]}|${sorted[j]}`, rec.win)
+  }
   if (rec.mode) {
     const f = (state.feat ??= { n: 0, runes: 0, aug: 0 })
     f.n++
@@ -1058,6 +1072,104 @@ export function augmentStats(state, { minGames = 30, champMinGames = 10, max = 6
   return { pooled, perChamp, k: { pool: kPool, champ: kChamp } }
 }
 
+/**
+ * ARAM Mayhem : objets qui vont avec chaque augment, tous champions confondus.
+ * - part : à quel point les joueurs qui ont pris l'augment achètent l'objet plus souvent que les
+ *   autres joueurs des mêmes champions (part attendue = part de l'objet chez ces champions) ;
+ * - écart : taux de victoire avec l'augment et l'objet, comparé à l'augment seul, une fois retiré
+ *   l'écart habituel de l'objet (acheté plus souvent quand on gagne), lissé (force mesurée).
+ * Renvoie { augment: [{ id, games, uplift, lift }] } (les plus liés d'abord).
+ */
+export function augmentItemStats(state, dd, { minGames = 20, minUplift = 0.05, max = 8 } = {}) {
+  const champs = Object.values(state.champs ?? {}).filter((c) => c.g >= 30)
+  let N = 0
+  let W = 0
+  for (const c of champs) {
+    N += c.g
+    W += c.w
+  }
+  if (!N) return {}
+  const base = W / N
+  const itemRate = (id) => {
+    const cell = state.itemAll?.[id]
+    return cell && cell[0] >= 50 ? cell[1] / cell[0] : null
+  }
+  const rows = []
+  for (const [a, items] of Object.entries(state.augItem ?? {})) {
+    // Joueurs ayant pris l'augment, par champion, et part attendue de chaque objet chez eux.
+    let n = 0
+    let w = 0
+    const expected = {}
+    for (const c of champs) {
+      const cell = c.aug?.[a]
+      if (!cell) continue
+      n += cell[0]
+      w += cell[1]
+      const all = c.ctxItems?.all ?? {}
+      for (const [id, [g]] of Object.entries(all)) expected[id] = (expected[id] ?? 0) + cell[0] * (g / c.g)
+    }
+    if (n < 50) continue
+    const rateA = w / n
+    for (const [id, [g, wins]] of Object.entries(items)) {
+      if (g < minGames || !dd.items.get(Number(id))?.isLegendary) continue
+      const ir = itemRate(id)
+      if (ir === null) continue
+      const dev = wins / g - rateA - (ir - base)
+      rows.push({ a, id, g, n, uplift: g / n - (expected[id] ?? 0) / n, dev, v: (rateA * (1 - rateA)) / g })
+    }
+  }
+  const k = momPrior(
+    rows.map((r) => [r.g, r.dev, r.v]),
+    { fallback: 3000, minCells: 40, minGames: 5000 }
+  ).k
+  const out = {}
+  for (const r of rows) {
+    if (r.uplift < minUplift) continue
+    ;(out[r.a] ??= []).push({
+      id: Number(r.id),
+      games: Math.round(r.g),
+      uplift: round3(r.uplift),
+      lift: round3(posterior(r.g, r.dev, k))
+    })
+  }
+  for (const a of Object.keys(out)) out[a] = out[a].sort((x, y) => y.uplift - x.uplift).slice(0, max)
+  return out
+}
+
+/**
+ * ARAM Mayhem : augments pris ensemble. Écart du taux de victoire des joueurs qui ont pris les deux,
+ * une fois retirés l'effet de chacun (regroupé) et le niveau du mode, lissé (force mesurée).
+ * Renvoie { 'a|b': [parties, écart] }, seulement les écarts d'au moins 0,4 point.
+ */
+export function augmentPairStats(state, pooled, { minGames = 30 } = {}) {
+  let N = 0
+  let W = 0
+  for (const c of Object.values(state.champs ?? {})) {
+    N += c.g
+    W += c.w
+  }
+  if (!N) return {}
+  const base = W / N
+  const cells = []
+  for (const [key, [g, w]] of Object.entries(state.augPair ?? {})) {
+    if (g < minGames) continue
+    const [a, b] = key.split('|')
+    if (!pooled[a] || !pooled[b]) continue
+    const dev = w / g - base - pooled[a].lift - pooled[b].lift
+    cells.push([key, g, dev, (base * (1 - base)) / g])
+  }
+  const k = momPrior(
+    cells.map(([, g, dev, v]) => [g, dev, v]),
+    { fallback: 5000, minCells: 40, minGames: 5000 }
+  ).k
+  const out = {}
+  for (const [key, g, dev] of cells) {
+    const lift = posterior(g, dev, k)
+    if (Math.abs(lift) >= 0.004) out[key] = [Math.round(g), round3(lift)]
+  }
+  return out
+}
+
 /** Données Data Dragon vues depuis la carte d'un mode : objets finaux de cette carte. */
 function mapView(dd, mapId) {
   const items = new Map()
@@ -1122,6 +1234,22 @@ export function buildMeta(state, dd0, previousMeta, options = {}) {
         if (list) b.augments = list.filter((x) => info[x.id])
       }
       extra.augmentPriors = aug.k
+      // Objets qui vont avec chaque augment, et augments qui vont ensemble.
+      const items = augmentItemStats(state, dd)
+      const named = {}
+      for (const [a, list] of Object.entries(items)) {
+        if (!info[a]) continue
+        const rows = list
+          .map(({ id, ...r }) => ({ item: dd.items.get(id)?.name, ...r }))
+          .filter((r) => r.item)
+        if (rows.length) named[a] = rows
+      }
+      if (Object.keys(named).length) extra.augmentItems = named
+      const pairs = augmentPairStats(state, aug.pooled)
+      const knownPairs = Object.fromEntries(
+        Object.entries(pairs).filter(([key]) => key.split('|').every((x) => info[x]))
+      )
+      if (Object.keys(knownPairs).length) extra.augmentPairs = knownPairs
     }
   }
   return {

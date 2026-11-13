@@ -182,6 +182,10 @@ En plus du classé, la collecte lit les parties de plusieurs modes, chacun avec 
   rareté et icône viennent des données du jeu (CommunityDragon). Effet de chaque augment : écart
   du taux de victoire des joueurs qui l'ont pris à celui de leur champion, lissé (force mesurée),
   puis, pour chaque champion, écart propre lissé vers l'effet de l'augment.
+- **Objets et augments** (`augmentItems`) : objets que les joueurs achètent bien plus souvent avec un
+  augment que les autres joueurs des mêmes champions, avec leur écart de taux de victoire (l'écart
+  habituel de l'objet retiré, lissé). **Augments pris ensemble** (`augmentPairs`) : écart propre à
+  la paire, une fois retiré l'effet de chacun, publié s'il atteint 0,4 point.
 
 ## Commandes
 
