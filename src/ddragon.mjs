@@ -2,7 +2,7 @@
 
 const DDRAGON = 'https://ddragon.leagueoflegends.com'
 
-async function getJson(url) {
+export async function getJson(url) {
   const res = await fetch(url)
   if (!res.ok) throw new Error(`Data Dragon : ${res.status} sur ${url}`)
   return res.json()

@@ -18,7 +18,19 @@ const cdragon = {
   ],
   '/latest/plugins/rcp-be-lol-game-data/global/default/v1/augment-lists.json': [
     { modeName: 'KIWI', augmentList: ['Maps/ModeSpecificData/Augments/ARAM_ADAPt', 'Maps/ModeSpecificData/Augments/escAPADe'] }
-  ]
+  ],
+  // Chaînes du jeu (descriptions des augments).
+  '/latest/game/en_us/data/menu/en_us/lol.stringtable.json': {
+    entries: {
+      kiwi_aram_adapt_name: 'ADAPt',
+      cherry_adapt_summary: 'Convert <scaleAD>Bonus Attack Damage</scaleAD> to <scaleAP>Ability Power</scaleAP>. Gain <scaleAP>@APAmp*100@% Ability Power</scaleAP>.'
+    }
+  },
+  '/latest/game/fr_fr/data/menu/fr_fr/lol.stringtable.json': {
+    entries: {
+      cherry_adapt_summary: 'Convertit les <scaleAD>dégâts d’attaque bonus</scaleAD> en <scaleAP>puissance</scaleAP>.'
+    }
+  }
 }
 const ddragon = {
   '/api/versions.json': ['16.21.1'],
@@ -73,8 +85,12 @@ function match(id) {
     ]
   }
   const champs = [64, 103, 103, 103, 103, 234, 103, 103, 103, 103]
+  // Joueurs : ceux des modes forment un petit groupe (on les retrouve de partie en partie).
+  const h = [...id].reduce((t, c) => t + c.charCodeAt(0), 0)
+  const puuids = champs.map((_, i) => (aram ? `fan${(h + i * 7) % 30}` : `r${i}`))
   const participants = champs.map((championId, i) => ({
     participantId: i + 1,
+    puuid: puuids[i],
     teamId: i < 5 ? 100 : 200,
     championId,
     championName: 'X',
@@ -111,7 +127,7 @@ function match(id) {
     }]))
   }))
   return [
-    { metadata: { matchId: id }, info: { queueId: queue, mapId: aram ? 12 : 11, gameVersion: '16.21.712.1', gameDuration: aram ? 1100 : 1800, participants, teams: [{ teamId: 100, bans: [{ championId: 234, pickTurn: 1 }] }, { teamId: 200, bans: [{ championId: -1, pickTurn: 6 }] }] } },
+    { metadata: { matchId: id, participants: puuids }, info: { queueId: queue, mapId: aram ? 12 : 11, gameVersion: '16.21.712.1', gameDuration: aram ? 1100 : 1800, participants, teams: [{ teamId: 100, bans: [{ championId: 234, pickTurn: 1 }] }, { teamId: 200, bans: [{ championId: -1, pickTurn: 6 }] }] } },
     { info: { frames } }
   ]
 }

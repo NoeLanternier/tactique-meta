@@ -57,13 +57,24 @@ test('collecte complète : Master+ et Or à Émeraude, puis réglage le lendemai
   assert.deepEqual(aram.junglers.LeeSin.vs, {})
   assert.ok(Object.keys(aram.junglers.LeeSin.against).length > 0)
   assert.ok(existsSync(join(out, 'state', 'modes', 'aram', '16.21.json')))
-  // ARAM Mayhem : pas de runes, des augments (noms anglais et français, rareté).
-  const mayhem = JSON.parse(readFileSync(join(out, 'meta-mayhem.json'), 'utf-8'))
-  assert.deepEqual(mayhem.features, { runes: false, augments: true })
-  assert.equal(mayhem.augmentInfo['1205'].nameFr, 'ADAPtation')
-  assert.equal(mayhem.augmentInfo['206'].rarity, 'prismatic')
-  assert.ok(mayhem.augmentInfo['1205'].games > 0)
-  assert.ok(mayhem.builds.some((b) => b.augments?.length))
+  // Joueurs trouvés dans les parties ARAM : leurs parties sont lues ensuite (bien plus que les
+  // 10 parties × 10 joueurs du classement).
+  const aramKept = Number(/\[ARAM\] terminé : (\d+) nouvelles parties/.exec(first.stdout)?.[1])
+  assert.ok(aramKept > 100, first.stdout)
+  // ARAM Mayhem : parties non publiées par Riot, jamais interrogées ; ses augments (données du
+  // jeu) sont publiés à part, avec leur description et ce qu'ils renforcent.
+  assert.ok(!existsSync(join(out, 'meta-mayhem.json')))
+  assert.match(first.stdout, /Modes privés, non publiés par Riot \(pas collectés\) : ARAM Mayhem/)
+  assert.doesNotMatch(first.stdout, /\[ARAM Mayhem\] terminé/)
+  const augments = JSON.parse(readFileSync(join(out, 'meta-augments.json'), 'utf-8'))
+  assert.equal(augments.patch, '16.21')
+  assert.deepEqual(augments.modes.KIWI, [206, 1205])
+  assert.equal(augments.augmentInfo['1205'].nameFr, 'ADAPtation')
+  assert.match(augments.augmentInfo['1205'].desc, /^Convert Bonus Attack Damage to Ability Power/)
+  assert.match(augments.augmentInfo['1205'].descFr, /^Convertit/)
+  assert.deepEqual(augments.augmentInfo['1205'].tags, { ap: 1 })
+  assert.equal(augments.augmentInfo['206'].desc, '')
+  assert.match(first.stdout, /\[Augments\] 2 augments décrits \(1 avec description\)/)
   // Modes temporaires absents : rien d'écrit, signalé dans le journal.
   assert.ok(!existsSync(join(out, 'meta-urf.json')))
   assert.match(first.stdout, /\[URF\] terminé : 0 nouvelles parties/)
@@ -72,6 +83,8 @@ test('collecte complète : Master+ et Or à Émeraude, puis réglage le lendemai
   // Le lendemain (mêmes parties déjà vues) : la méta de la veille sert au backtest et au réglage.
   const second = run({ MOCK_DAY: '2' })
   assert.equal(second.status, 0, second.stdout + second.stderr)
+  // Augments déjà décrits pour ce patch : pas de nouveau téléchargement.
+  assert.doesNotMatch(second.stdout, /\[Augments\]/)
   assert.match(second.stdout, /\[Master\+\] réglage du moteur : 1200 parties/)
   assert.match(second.stdout, /\[Master\+ · top\] réglage du moteur : 1200 parties/)
   assert.match(second.stdout, /\[Or à Émeraude\] réglage du moteur : 400 parties/)

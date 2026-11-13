@@ -152,24 +152,35 @@ Validation hors échantillon (parties du 10 et 11 novembre prédites avec la mé
 l'ancien lissage fixe, l'effet prédit d'un affrontement direct était 4 à 20 fois trop fort, et la
 prédiction était moins bonne que de ne rien prédire ; avec le lissage mesuré, elle est calibrée.
 
-## Modes : ARAM, ARAM Mayhem, modes temporaires
+## Modes : ARAM, modes temporaires (et ARAM Mayhem)
 
 En plus du classé, la collecte lit les parties de plusieurs modes, chacun avec sa méta
-(`meta-aram.json`, `meta-mayhem.json`, `meta-mayhem-classic.json`, `meta-arurf.json`,
-`meta-urf.json`, `meta-ofa.json`, `meta-brawl.json`) et son état (`state/modes/<mode>/`) :
+(`meta-aram.json`, `meta-arurf.json`, `meta-urf.json`, `meta-ofa.json`) et son état
+(`state/modes/<mode>/`) :
 
 | Mode | File interrogée | Carte | Particularités |
 | --- | --- | --- | --- |
 | ARAM | 450 | Abîme hurlant | champions au hasard, banc et relances |
-| ARAM Mayhem | 2400 | Abîme hurlant | augments (niveaux 3, 7, 11, 15), runes désactivées |
-| ARAM Mayhem Classic-ish | 2450 | Abîme hurlant | temporaire, augments |
-| ARURF, URF, Un pour tous, Brawl | 900, 1900, 1020, 2300 | Faille / autre | temporaires |
+| ARURF, URF, Un pour tous | 900, 1900, 1020 | Faille | temporaires |
+| ARAM Mayhem, Mayhem Classic-ish, Mêlée | 2400, 2450, 2300 | — | **privés : pas collectés** |
 
-- **Joueurs** : ceux du classement Or à Émeraude des régions de la méta Or (`MODE_REGIONS`
-  pour en choisir d'autres), tous rangs confondus : les modes n'ont qu'un niveau de données.
+- **Modes privés** : Riot ne publie pas les parties d'ARAM Mayhem (et de ses variantes, ni de la
+  Mêlée) dans son API. Elles n'apparaissent pas dans les listes de parties d'un joueur, et les
+  lire renvoie « accès refusé ». C'est volontaire : Riot ne veut pas de taux de victoire calculés
+  sur ces modes ([developer-relations #1109](https://github.com/RiotGames/developer-relations/issues/1109),
+  [#1204](https://github.com/RiotGames/developer-relations/issues/1204)). Ils ne sont donc jamais
+  interrogés. L'app utilise pour ARAM Mayhem la méta ARAM (même carte, mêmes objets, sans les
+  runes) et classe les augments d'après ce qu'ils renforcent (voir `meta-augments.json`). Le
+  calcul des statistiques d'augments (`augmentInfo`, `augmentItems`, `augmentPairs` dans
+  aggregate.mjs, testé) reste prêt si Riot ouvre un jour ces données.
+- **Joueurs** : d'abord ceux trouvés dans les parties du mode déjà lues (ils y jouent, donc
+  presque chaque requête rapporte des parties), puis ceux du classement Or à Émeraude des régions
+  de la méta Or (`MODE_REGIONS` pour en choisir d'autres). Tous rangs confondus : les modes n'ont
+  qu'un niveau de données. (Avant : uniquement les joueurs classés, qui jouent peu en ARAM :
+  environ 35 requêtes par partie ARAM trouvée ; maintenant environ 2.)
 - **Budget** : la clé est partagée avec le classé. Tant que le classé collecte, les modes ne
   prennent pas plus de **25 %** des requêtes de chaque serveur (40 % avec une clé de production) ;
-  quand le classé a fini, ils prennent tout le reste.
+  quand le classé a fini, ils prennent tout le reste. Les modes actifs avancent chacun leur tour.
 - **Modes temporaires** : si aucun des 25 premiers joueurs n'a de partie récente dans ce mode, il
   n'est plus interrogé jusqu'à la collecte suivante ; sa méta et son état précédents sont gardés.
 - **Par partie**, les dix joueurs comptent (pas de poste) : builds, départs, bottes, compétences,
@@ -177,15 +188,19 @@ En plus du classé, la collecte lit les parties de plusieurs modes, chacun avec 
   la partie, avec les objets finaux de la carte du mode. Repères propres aux modes : or et
   dégâts aux champions par minute, morts par 10 minutes, part des dégâts de l'équipe.
 - **Runes et augments** : la méta indique ce qui est réellement utilisé dans les parties
-  (`features`). En ARAM Mayhem, les builds sont publiés sans runes (`runes: null`).
-- **Augments** (`augmentInfo`, et `augments` dans chaque build) : noms anglais et français,
-  rareté et icône viennent des données du jeu (CommunityDragon). Effet de chaque augment : écart
-  du taux de victoire des joueurs qui l'ont pris à celui de leur champion, lissé (force mesurée),
-  puis, pour chaque champion, écart propre lissé vers l'effet de l'augment.
-- **Objets et augments** (`augmentItems`) : objets que les joueurs achètent bien plus souvent avec un
-  augment que les autres joueurs des mêmes champions, avec leur écart de taux de victoire (l'écart
-  habituel de l'objet retiré, lissé). **Augments pris ensemble** (`augmentPairs`) : écart propre à
-  la paire, une fois retiré l'effet de chacun, publié s'il atteint 0,4 point.
+  (`features`).
+
+### meta-augments.json : les augments (données du jeu)
+
+Les augments d'ARAM Mayhem et de Mayhem Classic-ish (listes `KIWI` et `KIWI_JADE` du jeu), sans
+aucune statistique de parties : nom anglais et français, rareté, icône, description (anglais et,
+quand CommunityDragon répond, français), objet amélioré (« Upgrade Infinity Edge »), objets
+finaux cités (quêtes « Possède … ») et ce que l'augment renforce (`tags` : puissance, dégâts
+d'attaque, attaques, vitesse d'attaque, critiques, effets à l'impact, compétences, accélération,
+ultime, résistances, soins, boucliers, alliés, vol de vie, mana, vitesse, contrôles, or, sorts
+d'invocateur). Les descriptions viennent des chaînes du jeu (`lol.stringtable.json`, ≈ 30 Mo
+par langue) : le fichier n'est recalculé qu'au changement de patch, quand un augment apparaît,
+ou si le français manquait la fois précédente.
 
 ## Commandes
 
@@ -196,7 +211,7 @@ npm start                         # collecte complète (90 min par défaut ; sur
 npm test                          # tests sur données simulées
 ```
 
-Options : `--minutes 90`, `--roles jungle,mid`, `--regions euw1,kr,na1`, `--gold-regions euw1` (vide : pas de méta Or), `--modes aram,mayhem` (vide : aucun mode), `--mode-regions euw1`, `--min-games 40`, `--out dossier`.
+Options : `--minutes 90`, `--roles jungle,mid`, `--regions euw1,kr,na1`, `--gold-regions euw1` (vide : pas de méta Or), `--modes aram,urf` (vide : aucun mode ; les modes privés sont ignorés), `--mode-regions euw1`, `--min-games 40`, `--out dossier`.
 
 ## Limites
 
