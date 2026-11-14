@@ -322,7 +322,10 @@ export function extractPlayers(match, timeline, dd, roles = ROLES, mode = null) 
       runeSig = `${primary.style}|${perks.join(',')}|${sub.style}|${sp.offense},${sp.flex},${sp.defense}`
     }
 
-    const timed = purchases(events.get(p.participantId) ?? [])
+    // (une évolution, Étreinte du séraphin…, n'est pas un achat : seule la forme achetée compte.)
+    const timed = purchases(events.get(p.participantId) ?? []).filter(
+      (b) => !dd.items.get(b.id)?.evolvesFrom
+    )
     const bought = timed.map((b) => b.id)
     const legendaries = []
     const legendaryMin = []

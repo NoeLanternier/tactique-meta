@@ -65,7 +65,16 @@ const itemJson = {
     6333: item("Death's Dance", 3300, { stats: { FlatPhysicalDamageMod: 60, FlatArmorMod: 50 } }),
     3026: item('Guardian Angel', 3200, { stats: { FlatPhysicalDamageMod: 55 } }),
     3156: item('Maw of Malmortius', 3100, { stats: { FlatPhysicalDamageMod: 60 } }),
-    6610: item('Sundered Sky', 3100, { stats: { FlatPhysicalDamageMod: 40 } })
+    6610: item('Sundered Sky', 3100, { stats: { FlatPhysicalDamageMod: 40 } }),
+    // Objets qui évoluent en partie (sans achat) : Manamune → Muramana, Cercle → Diadème.
+    3004: item('Manamune', 2900, { stats: { FlatPhysicalDamageMod: 35 } }),
+    3042: item('Muramana', 2900, {
+      specialRecipe: 3004,
+      inStore: false,
+      gold: { total: 2900, purchasable: false }
+    }),
+    2526: item('Whispering Circlet', 2250, { into: ['2530'] }),
+    2530: item('Diadem of Songs', 2250, { specialRecipe: 2526, inStore: false })
   }
 }
 const championJson = {
@@ -158,6 +167,17 @@ test("extraction : ordre d'achat, annulation, bottes, familier, compétences", (
   assert.equal(lee.pet, 1101)
   assert.equal(lee.skills, 'Q>E>W')
   assert.equal(lee.runeSig, '8000|8010,9111,9104,8014,8304,8347|8300|5005,5008,5001')
+})
+
+test('objets qui évoluent : forme achetée seulement, objet final qui évolue', () => {
+  assert.equal(dd.items.get(3042).evolvesFrom, 3004)
+  assert.equal(dd.items.get(3004).evolvesFrom, null)
+  // Cercle murmurant ne mène qu'à son évolution : c'est un objet final.
+  assert.equal(dd.items.get(2526).isLegendary, true)
+  // La chronologie note l'évolution comme un achat : pas un objet du cœur.
+  const [m, t] = fakeGame(true, [6692, 3004, 3042, 6333])
+  const lee = extractJunglers(m, t, dd).find((r) => r.champ === 'LeeSin')
+  assert.deepEqual(lee.core, [6692, 3004, 6333])
 })
 
 test('ordre des compétences sur partie courte', () => {

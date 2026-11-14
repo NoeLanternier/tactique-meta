@@ -8,6 +8,16 @@ export async function getJson(url) {
   return res.json()
 }
 
+/**
+ * Évolution en partie : objet absent de la boutique dont la « recette spéciale » est un autre objet
+ * (Étreinte du séraphin ← Bâton de l'archange, Muramana ← Manamune, Fimbulwinter ← Approche de
+ * l'hiver…). Null pour un objet qu'on achète.
+ */
+export function evolutionOf(it) {
+  const from = Number(it?.specialRecipe)
+  return from > 0 && (it?.inStore === false || it?.gold?.purchasable === false) ? from : null
+}
+
 /** Caractéristiques d'un objet tirées de sa description (voir FOE_TRAITS dans extract.mjs). */
 export function itemTraits(desc, stats) {
   const t = []
@@ -51,9 +61,15 @@ export function buildDdragon(version, championJson, itemJson, runesJson) {
         .filter(([, v]) => v)
         .map(([k]) => Number(k))
     )
-    // Un objet dont les seules évolutions sont réservées à Ornn reste un objet final.
-    const intoOnlyOrnn =
-      into.length > 0 && into.every((id) => itemJson.data[id]?.requiredAlly === 'Ornn')
+    // Un objet dont les seules évolutions sont réservées à Ornn reste un objet final, comme un objet
+    // qui ne mène qu'à sa propre évolution en partie (Cercle murmurant → Diadème des chants).
+    const intoOnlySpecial =
+      into.length > 0 &&
+      into.every(
+        (id) =>
+          itemJson.data[id]?.requiredAlly === 'Ornn' ||
+          evolutionOf(itemJson.data[id]) === Number(idStr)
+      )
     items.set(Number(idStr), {
       id: Number(idStr),
       name: it.name,
@@ -64,17 +80,19 @@ export function buildDdragon(version, championJson, itemJson, runesJson) {
       isPet: tags.includes('Jungle') && !tags.includes('Consumable') && total >= 300,
       isLegendary:
         onRift &&
-        (into.length === 0 || intoOnlyOrnn) &&
+        (into.length === 0 || intoOnlySpecial) &&
         total >= 2000 &&
         !tags.includes('Consumable') &&
         !tags.includes('Boots'),
       // Objet final, quelle que soit la carte (voir legendaryOn).
       isFull:
-        (into.length === 0 || intoOnlyOrnn) &&
+        (into.length === 0 || intoOnlySpecial) &&
         total >= 2000 &&
         !tags.includes('Consumable') &&
         !tags.includes('Boots'),
       maps,
+      // Forme évoluée en partie (Étreinte du séraphin ← Bâton de l'archange) : jamais achetée.
+      evolvesFrom: evolutionOf(it),
       traits: itemTraits(desc, it.stats ?? {})
     })
   }
