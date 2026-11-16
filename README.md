@@ -153,11 +153,12 @@ Validation hors échantillon (parties du 10 et 11 novembre prédites avec la mé
 l'ancien lissage fixe, l'effet prédit d'un affrontement direct était 4 à 20 fois trop fort, et la
 prédiction était moins bonne que de ne rien prédire ; avec le lissage mesuré, elle est calibrée.
 
-## Objet suivant (4e au 6e objet)
+## Objet suivant (3e au 6e objet)
 
-Le build conseillé ne s'arrête pas aux trois objets du cœur : chaque achat du 4e au 6e objet
-légendaire est mesuré **selon ce qui est déjà possédé et selon la partie**, à **or égal**
-(`src/nextItems.mjs`, publié dans `builds[].next`).
+Chaque achat du 3e au 6e objet légendaire est mesuré **selon ce qui est déjà possédé et selon la
+partie**, à **or égal** (`src/nextItems.mjs`, publié dans `builds[].next`). Le 3e objet complète le
+cœur : l'app ne le remplace que si un autre gagne nettement plus après les deux premiers dans cette
+partie (par exemple face à un adversaire très en avance).
 
 - **À or égal.** Un objet acheté surtout en menant gagne souvent… parce qu'on menait. Chaque achat
   est donc comparé à la victoire attendue selon l'écart d'or de l'équipe à ce moment (courbe par
@@ -167,7 +168,12 @@ légendaire est mesuré **selon ce qui est déjà possédé et selon la partie**
   presque tout le monde a déjà ne dit rien de plus. Un objet presque jamais pris après un objet
   possédé (moins de 5 achats sur au moins 300) est écarté.
 - **Selon la partie.** Mêmes interactions avec la composition adverse (dégâts magiques ou
-  physiques, soins, résistance, contrôles) et avec l'avance ou le retard au moment de l'achat.
+  physiques, soins, résistance, contrôles) et alliée (voir « Équipe alliée »), avec l'avance ou le
+  retard au moment de l'achat, et avec un **adversaire très en avance** à ce moment (au moins 30 %
+  d'or de plus que la moyenne de son équipe et 1 500 pièces d'or de plus), selon ses dégâts
+  (`fedAp` : surtout magiques, `fedAd` : surtout physiques). L'app impose toujours un objet
+  anti-soins face à une équipe qui soigne beaucoup, sauf si la mesure le contredit pour ce
+  champion.
 - **Lissage mesuré**, comme le reste (`priors.nx0`, `nxJ`, `nxC`) : l'écart propre est rapproché
   de l'écart moyen de l'objet sur tous les champions, les interactions sont rapprochées de 0.
 
@@ -176,13 +182,14 @@ les objets un par un : le suivant est celui qui gagne le plus après les objets 
 corrigé par les besoins de la partie (règles, adversaires précis, tes parties).
 
 **Preuve hors échantillon.** Chaque nuit, avant d'ajouter les nouvelles parties, chaque achat du
-4e au 6e objet est comparé au conseil de la méta de la veille (`backtest.next` dans `meta.json`) :
+3e au 6e objet est comparé au conseil de la méta de la veille (`backtest.next` dans `meta.json`) :
 
 - victoires en plus des achats conformes au conseil moins celles des autres achats (`gain`, avec
   son erreur type `se`), pour plusieurs poids de la popularité (`gamma` : part des joueurs qui
   prennent l'objet après les mêmes objets, de 0 à 1) ;
 - calibration : victoires en plus observées par point d'écart prévu (1 : prévisions exactes) ;
-- l'ancien conseil (objets les plus construits selon le contexte), jugé de la même façon (`old`).
+- l'ancien conseil (objets les plus construits selon le contexte), jugé de la même façon sur les
+  achats du 4e au 6e objet (`old`).
 
 Dès 1 000 achats vérifiés, `nextModel` publie le poids de popularité qui a le mieux réussi et la
 pente de calibration (rapprochée de 1 selon son incertitude, bornée entre 0 et 2) : l'app multiplie
@@ -193,6 +200,30 @@ est affiché dans l'app (Réglages, « Qualité du moteur », et Bilan, « L'app
 Mesure sur les vraies parties avant ce modèle (backtest publié par les six métas) : acheter un
 des trois objets les plus construits selon le contexte ne gagnait pas plus que les autres achats
 (de −0,5 à +0,8 point selon la méta), d'où ce modèle.
+
+## Adversaire direct, équipe alliée et moment des bottes
+
+**Adversaire direct** (le jungler adverse pour un jungler, le joueur d'en face sinon). Le départ,
+les bottes, la clé de voûte, la famille de build (1er objet), le moment des bottes et le familier
+sont mesurés face à chaque adversaire (`opp` dans `builds[].choices` et `builds[].variants`) :
+écart du taux de victoire de l'option face à lui, une fois retirés le taux habituel de l'option et
+l'effet de cet adversaire sur le champion (un adversaire fort fait perdre toutes les options : cela
+n'en distingue aucune). Écarts lissés avec la force mesurée (`priors.choiceVs`), publiés à partir
+de 0,3 point. Le backtest de la famille et le réglage du moteur en tiennent compte.
+
+**Équipe alliée.** Deux contextes de plus, tirés de la composition attendue des quatre alliés :
+`allyAp` (alliés surtout magiques, au moins 55 % de dégâts magiques) et `allyAd` (surtout physiques,
+35 % au plus). Ils comptent partout comme la composition adverse : familles de build (un champion
+qui joue AP ou AD, comme Kai'Sa ou Varus), runes et autres choix, objets, objet suivant. L'app
+n'utilise plus sa règle manuelle des dégâts qui manquent à l'équipe dès que la méta mesure ces
+contextes.
+
+**Moment des bottes** (`builds[].choices.bootsT`) : avant le 1er objet légendaire (`early`), entre le
+1er et le 2e (`first`) ou après (`later`), selon la composition et l'adversaire direct. L'app place
+les bottes au moment le plus courant pour le champion, sauf si un autre gagne nettement plus.
+
+Ces mesures demandent beaucoup de parties par adversaire : avec peu de données, l'écart lissé est
+proche de zéro et l'app garde le choix habituel. La clé de production multipliera les données.
 
 ## Modes : ARAM, modes temporaires (et ARAM Mayhem)
 

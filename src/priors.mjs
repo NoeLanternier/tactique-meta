@@ -26,8 +26,9 @@ export const stateOfLead = (lead) =>
       : lead <= -LEAD_THRESHOLD
         ? 'b'
         : 'e'
-const COMP_CONTEXTS = ['ap', 'ad', 'heal', 'tank', 'cc']
-const CHOICE_KINDS = ['runes', 'boots', 'pet', 'skills']
+// (allyAp / allyAd : composition de sa propre équipe, voir aggregate.mjs.)
+const COMP_CONTEXTS = ['ap', 'ad', 'heal', 'tank', 'cc', 'allyAp', 'allyAd']
+const CHOICE_KINDS = ['runes', 'boots', 'pet', 'skills', 'start', 'bootsT']
 
 /** Valeurs utilisées tant qu'une famille n'a pas assez de données pour être mesurée. */
 export const DEFAULT_PRIORS = {
@@ -49,6 +50,11 @@ export const DEFAULT_PRIORS = {
   c3: 1000,
   slot: 1000,
   choiceCtx: 3000,
+  // Choix (départ, bottes, clé de voûte, familier, famille, moment des bottes) face à l'adversaire
+  // direct : écart propre (effet de cet adversaire sur le champion retiré).
+  choiceVs: 5000,
+  // Moment des bottes (avant le 1er objet, entre le 1er et le 2e, après).
+  bootsT: 3000,
   // Objet suivant (voir nextItems.mjs) : écart propre au champion, après un objet, par contexte.
   nx0: 3000,
   nxJ: 5000,
@@ -109,6 +115,60 @@ export function noiseScale(withCells) {
   return clamp(s.obs / s.noise, 0.2, 1)
 }
 
+/** Totaux [parties, victoires] d'un champion pour chaque type de choix mesuré face à l'adversaire. */
+function choiceTotals(c, kind) {
+  if (kind === 'fam') return c.c1 ?? {}
+  if (kind !== 'keystone') return c[kind] ?? {}
+  const out = {}
+  for (const [sig, [g, w]] of Object.entries(c.runes ?? {})) {
+    const cell = (out[String(sig).split('|')[1]?.split(',')[0] ?? ''] ??= [0, 0])
+    cell[0] += g
+    cell[1] += w
+  }
+  return out
+}
+
+/** Choix mesurés face à l'adversaire direct (familier : compteurs petVs, déjà tenus). */
+export const OPP_KINDS = ['start', 'boots', 'keystone', 'fam', 'pet', 'bootsT']
+
+/**
+ * Choix d'un champion face à chaque adversaire direct (le jungler adverse pour un jungler, le
+ * joueur d'en face sinon) : écart du taux de victoire de l'option face à lui, une fois retirés le
+ * taux habituel de l'option et l'effet de cet adversaire sur le champion (un adversaire fort fait
+ * perdre toutes les options : cela ne distingue aucune d'elles).
+ * Lignes { kind, value, opp, n, d, v } (v : variance due au hasard).
+ */
+export function oppRows(c, { minGames = 15, minOption = 100, minOpp = 30 } = {}) {
+  const out = []
+  if (!(c?.g > 0)) return out
+  const b = c.w / c.g
+  for (const kind of OPP_KINDS) {
+    const byOpp = kind === 'pet' ? c.petVs : c.optVs?.[kind]
+    if (!byOpp) continue
+    const totals = choiceTotals(c, kind)
+    for (const [opp, byValue] of Object.entries(byOpp)) {
+      const vo = c.vs?.[opp]
+      if (!vo || vo[0] < minOpp) continue
+      const shift = rate(vo) - b
+      const vOpp = binVar(b, vo[0]) * Math.max(0, 1 - vo[0] / c.g)
+      for (const [value, cell] of Object.entries(byValue ?? {})) {
+        const all = totals[value]
+        if (!all || all[0] < minOption || cell[0] < minGames) continue
+        const ro = rate(all)
+        out.push({
+          kind,
+          value,
+          opp,
+          n: cell[0],
+          d: rate(cell) - ro - shift,
+          v: binVar(ro, cell[0]) * Math.max(0, 1 - cell[0] / all[0]) + vOpp
+        })
+      }
+    }
+  }
+  return out
+}
+
 const FAMILIES = [
   'vs',
   'with',
@@ -127,6 +187,8 @@ const FAMILIES = [
   'c3',
   'slot',
   'choiceCtx',
+  'choiceVs',
+  'bootsT',
   'nx0',
   'nxJ',
   'nxC'
@@ -167,7 +229,7 @@ function priorCells(state) {
       cells.comp.push([g, rate(cell) - b - ctxMean[ctx], ctxShift[ctx].v])
     }
 
-    for (const kind of ['runes', 'boots', 'skills', 'start', 'pet', 'c1'])
+    for (const kind of ['runes', 'boots', 'skills', 'start', 'pet', 'c1', 'bootsT'])
       cells[kind].push(...partitionCells(c[kind]))
     const keystones = {}
     for (const [sig, [g, w]] of Object.entries(c.runes ?? {})) {
@@ -221,6 +283,8 @@ function priorCells(state) {
       }
     }
   }
+  // Choix face à l'adversaire direct.
+  for (const c of champs) for (const r of oppRows(c)) cells.choiceVs.push([r.n, r.d, r.v])
   // Objet suivant : écarts propres (au champion, après un objet, par contexte).
   Object.assign(cells, nextCells(state))
   return { cells, scale: noiseScale(cells.with) }

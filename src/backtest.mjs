@@ -9,7 +9,7 @@
 //   avantagerait ceux qui ont peu d'objets (les parties gagnées vite), ce qui faussait l'ancienne
 //   mesure.
 //
-// - Objet suivant : chaque achat du 4e au 6e objet comparé au premier conseil de la veille, en
+// - Objet suivant : chaque achat du 3e au 6e objet comparé au premier conseil de la veille, en
 //   victoires en plus par rapport à la victoire attendue selon l'écart d'or à cet achat (voir
 //   nextItems.mjs), avec l'ancien conseil jugé de la même façon pour comparaison.
 //
@@ -21,8 +21,11 @@ import { DEFAULT_PRIORS } from './priors.mjs'
 import { posterior } from './stats.mjs'
 import { evaluateNext } from './nextItems.mjs'
 
-/** Famille recommandée pour une partie : meilleur taux estimé dans les contextes de la partie. */
-export function recommendedVariant(build, contexts, priors = DEFAULT_PRIORS) {
+/**
+ * Famille recommandée pour une partie : meilleur taux estimé dans les contextes de la partie, et
+ * face à l'adversaire direct (écart propre publié déjà lissé, `opp`).
+ */
+export function recommendedVariant(build, contexts, priors = DEFAULT_PRIORS, opponent = null) {
   const variants = build?.variants ?? []
   if (variants.length < 2) return null
   const prior = build.winRate ?? 0.5
@@ -33,7 +36,9 @@ export function recommendedVariant(build, contexts, priors = DEFAULT_PRIORS) {
     const base = prior + posterior(v.games ?? 0, v.winRate - prior, kFam)
     const specific = contexts.filter((c) => c !== 'all' && v.contexts?.[c])
     const shifts = specific.map((c) => posterior(v.contexts[c][0], v.contexts[c][1] - base, kCtx))
-    const score = base + (shifts.length ? shifts.reduce((a, b) => a + b, 0) / shifts.length : 0)
+    const vs = opponent ? (v.opp?.[opponent]?.[1] ?? 0) : 0
+    const score =
+      base + (shifts.length ? shifts.reduce((a, b) => a + b, 0) / shifts.length : 0) + vs
     if (!best || score > best.score) best = { key: v.key, score }
   }
   return best?.key ?? null
@@ -70,7 +75,7 @@ export function evaluateRecord(meta, contexts, rec, bt, dd) {
   const name = (id) => dd.items.get(Number(id))?.name
   let counted = false
 
-  const variant = recommendedVariant(build, contexts, meta.priors)
+  const variant = recommendedVariant(build, contexts, meta.priors, rec.enemyJungler)
   if (variant && rec.core.length >= 1) {
     inc(name(rec.core[0]) === variant ? bt.variant.followed : bt.variant.other, rec.win)
     counted = true
@@ -88,7 +93,7 @@ export function evaluateRecord(meta, contexts, rec, bt, dd) {
     inc(wanted.includes(items[k]) ? bt.items.high : bt.items.low, rec.win)
     counted = true
   }
-  // Objet suivant (4e au 6e objet) : conseil de la veille, à avance égale (voir nextItems.mjs).
+  // Objet suivant (3e au 6e objet) : conseil de la veille, à avance égale (voir nextItems.mjs).
   if (bt.next && evaluateNext(meta, contexts, rec, bt.next, dd, recommendedItems)) counted = true
   if (counted) bt.games++
 }

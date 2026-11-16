@@ -117,6 +117,40 @@ export function leadAt(timeline, teamOf, team, minute) {
 }
 
 /**
+ * Adversaire très en avance à une minute donnée : celui qui a le plus d'or, s'il en a au moins 30 %
+ * de plus que la moyenne de son équipe (lui compris) et 1 500 pièces d'or de plus. Renvoie son
+ * identifiant de participant, ou null.
+ */
+export function fedAt(timeline, teamOf, team, minute) {
+  const frames = timeline?.info?.frames ?? []
+  if (!frames.length) return null
+  const frame = frames[Math.max(0, Math.min(frames.length - 1, Math.floor(minute)))]
+  const foes = []
+  for (const [pid, pf] of Object.entries(frame?.participantFrames ?? {}))
+    if (teamOf.get(Number(pid)) !== team) foes.push([Number(pid), Number(pf?.totalGold) || 0])
+  if (foes.length < 5) return null
+  const mean = foes.reduce((t, [, g]) => t + g, 0) / foes.length
+  const [pid, gold] = foes.sort((a, b) => b[1] - a[1])[0]
+  return mean > 0 && gold >= 1.3 * mean && gold - mean >= 1500 ? pid : null
+}
+
+/**
+ * Moment des bottes (bottes de niveau 2) par rapport aux objets légendaires : 'early' avant le 1er,
+ * 'first' entre le 1er et le 2e, 'later' après le 2e (ou jamais, avec au moins deux objets). Null
+ * si la partie est trop courte pour le savoir.
+ */
+export function bootsTiming(bootsMin, legendaryMin) {
+  const [l1, l2] = legendaryMin
+  if (typeof bootsMin === 'number') {
+    if (typeof l1 !== 'number') return null
+    if (bootsMin < l1) return 'early'
+    if (typeof l2 !== 'number' || bootsMin < l2) return typeof l2 === 'number' ? 'first' : null
+    return 'later'
+  }
+  return typeof l2 === 'number' ? 'later' : null
+}
+
+/**
  * Caractéristiques d'un objet adverse qui changent la valeur de nos objets : anti-soins, dégâts en
  * % des PV, boucliers, protections contre les contrôles et le burst (stase, bouclier anti-sort,
  * purge), pénétration, résistances, vol de vie. Déduites de la description Data Dragon.
@@ -335,7 +369,8 @@ export function extractPlayers(match, timeline, dd, roles = ROLES, mode = null) 
         legendaryMin.push(Math.round(b.min * 10) / 10)
       }
     }
-    const boots = bought.find((id) => dd.items.get(id)?.isBoots) ?? null
+    const bootsBuy = timed.find((b) => dd.items.get(b.id)?.isBoots) ?? null
+    const boots = bootsBuy?.id ?? null
     const pet = jungle ? (bought.find((id) => dd.items.get(id)?.isPet) ?? null) : null
     // Objets de départ : achats de la première minute et demie (familier, anneau de Doran…).
     const start = timed
@@ -377,7 +412,14 @@ export function extractPlayers(match, timeline, dd, roles = ROLES, mode = null) 
         const lead = leadAt(timeline, teamOf, p.teamId, min)
         return lead === null ? null : Math.round(lead * 1000) / 1000
       }),
+      // Adversaire très en avance à chaque achat (champion), pour les objets de protection.
+      itemFed: legendaryMin.slice(0, 6).map((min) => {
+        const pid = fedAt(timeline, teamOf, p.teamId, min)
+        const x = pid ? info.participants.find((q) => Number(q.participantId) === pid) : null
+        return x ? champOf(x) : null
+      }),
       boots,
+      bootsT: bootsTiming(bootsBuy?.min, legendaryMin),
       pet,
       start: start.length ? start.join(',') : null,
       skills: skillOrder(events.get(p.participantId) ?? []),

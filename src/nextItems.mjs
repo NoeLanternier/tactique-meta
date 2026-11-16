@@ -1,5 +1,6 @@
-// Objet suivant : quel 4e, 5e ou 6e objet légendaire acheter, compte tenu des objets déjà achetés,
-// de la composition adverse et de l'état de la partie au moment de l'achat.
+// Objet suivant : quel 3e, 4e, 5e ou 6e objet légendaire acheter, compte tenu des objets déjà
+// achetés, de la composition des deux équipes et de l'état de la partie au moment de l'achat (avance
+// ou retard, adversaire très en avance).
 //
 // Pourquoi une mesure à part. Comparer le taux de victoire des parties où un objet tardif a été
 // acheté ne dit presque rien : on achète un 5e objet surtout dans les parties longues, on se paie
@@ -17,10 +18,42 @@
 
 import { momPrior, posterior } from './stats.mjs'
 
-/** Rangs évalués (0 = 1er objet légendaire) : 4e, 5e et 6e objets. */
-export const NEXT_RANKS = [3, 4, 5]
-/** Contextes : composition adverse, et avance ou retard au moment de l'achat. */
-export const NEXT_CONTEXTS = ['ap', 'ad', 'heal', 'tank', 'cc', 'ahead', 'behind']
+/**
+ * Rangs évalués (0 = 1er objet légendaire) : du 3e au 6e objet. Le 3e objet complète le cœur ; le
+ * mesurer ici permet de le remplacer quand la partie l'exige (adversaire très en avance…).
+ */
+export const NEXT_RANKS = [2, 3, 4, 5]
+/**
+ * Contextes : composition adverse et alliée, avance ou retard au moment de l'achat, et adversaire
+ * très en avance à ce moment, selon ses dégâts (fedAp : surtout magiques, fedAd : physiques).
+ */
+export const NEXT_CONTEXTS = [
+  'ap',
+  'ad',
+  'heal',
+  'tank',
+  'cc',
+  'allyAp',
+  'allyAd',
+  'ahead',
+  'behind',
+  'fedAp',
+  'fedAd'
+]
+
+/**
+ * Contexte « adversaire très en avance » de chaque achat (rec.itemFed : son champion) : 'fedAp' si
+ * ses dégâts sont surtout magiques, 'fedAd' s'ils sont surtout physiques (profils mesurés).
+ */
+export function fedContexts(profiles, fed) {
+  return (fed ?? []).map((champ) => {
+    const p = champ ? profiles?.[champ] : null
+    const dmg = p ? (p.phys ?? 0) + (p.magic ?? 0) : 0
+    if (!p || !(dmg > 0) || (p.g ?? 0) < 20) return null
+    const ap = p.magic / dmg
+    return ap >= 0.6 ? 'fedAp' : ap <= 0.4 ? 'fedAd' : null
+  })
+}
 /** Bornes des tranches d'écart d'or entre les équipes (part de l'or adverse). */
 export const LEAD_EDGES = [-0.15, -0.07, -0.025, 0.025, 0.07, 0.15]
 /** Poids de la popularité essayés par le backtest (1 : la popularité décide presque seule). */
@@ -54,7 +87,7 @@ function addCell(map, key, win, e) {
 
 /**
  * Ajoute les achats d'une partie : courbe de victoire du poste par rang et tranche d'écart d'or
- * (state.lead), et décisions du 4e au 6e objet du champion (c.nx : '*' tous achats, a[objet
+ * (state.lead), et décisions du 3e au 6e objet du champion (c.nx : '*' tous achats, a[objet
  * possédé], x[contexte]), chacune avec sa victoire attendue (cellules [achats, victoires,
  * victoires attendues]).
  */
@@ -82,6 +115,8 @@ export function addNext(state, c, rec, contexts) {
     const ctx = contexts.filter((x) => x !== 'all' && NEXT_CONTEXTS.includes(x))
     const st = STATE_CTX[rec.itemState?.[k]]
     if (st) ctx.push(st)
+    const fed = rec.itemFedCtx?.[k]
+    if (fed) ctx.push(fed)
     for (const x of ctx) addCell((nx.x[x] ??= {}), id, rec.win, e)
   }
 }
@@ -177,7 +212,7 @@ export function nextCells(state, pooled = pooledNext(state)) {
   return cells
 }
 
-/** Achats minimaux du champion (4e au 6e objet) pour publier ses mesures. */
+/** Achats minimaux du champion (3e au 6e objet) pour publier ses mesures. */
 const MIN_NEXT_GAMES = 60
 /** Achats minimaux d'un objet après un autre (ou dans un contexte) pour être publié. */
 const MIN_LISTED = 5
@@ -314,7 +349,7 @@ export function emptyNextBacktest() {
 }
 
 /**
- * Juge chaque achat du 4e au 6e objet d'une partie avec la méta de la veille : victoire en plus
+ * Juge chaque achat du 3e au 6e objet d'une partie avec la méta de la veille : victoire en plus
  * (écart à l'attente selon l'avance), selon que l'objet acheté était le premier conseil ou non.
  * `oldRecommend(build, contexts, owned)` : ancien conseil (3 objets) pour comparaison.
  */
@@ -333,7 +368,8 @@ export function evaluateNext(meta, contexts, rec, bt, dd, oldRecommend) {
     if (!actual || typeof p !== 'number') continue
     const owned = names.slice(0, k).filter(Boolean)
     const st = STATE_CTX[rec.itemState?.[k]]
-    const ctx = st ? [...comp, [st, 1]] : comp
+    const fed = rec.itemFedCtx?.[k]
+    const ctx = [...comp, ...(st ? [[st, 1]] : []), ...(fed ? [[fed, 1]] : [])]
     const ranked = rankNext(next, owned, ctx, { gamma: 0, slope: 1 })
     const mine = ranked.find((x) => x.item === actual)
     if (ranked.length < 3 || !mine) continue
@@ -360,7 +396,8 @@ export function evaluateNext(meta, contexts, rec, bt, dd, oldRecommend) {
     bt.cal[2] += ex
     bt.cal[3] += x * x
     bt.cal[4] += x * ex
-    if (oldRecommend) {
+    // (ancien conseil : objets après le cœur seulement, comme son backtest d'origine.)
+    if (oldRecommend && k >= 3) {
       const wanted = oldRecommend(build, st ? [...contexts, st] : contexts, owned)
       if (wanted.length >= 3) {
         const cell = wanted.includes(actual) ? bt.old.f : bt.old.o

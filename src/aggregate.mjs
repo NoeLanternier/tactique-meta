@@ -12,6 +12,7 @@ import {
   championItemLift,
   measureFit,
   measurePriors,
+  oppRows,
   pooledItemLifts
 } from './priors.mjs'
 import { legendaryOn } from './ddragon.mjs'
@@ -27,8 +28,11 @@ import {
 import { MODES } from './modes.mjs'
 
 export const STATE_VERSION = 7
-/** Contextes adverses pour lesquels on mesure la performance des objets. */
-export const CONTEXTS = ['all', 'ap', 'ad', 'heal', 'tank', 'cc']
+/**
+ * Contextes pour lesquels on mesure la performance des objets et des choix : composition adverse,
+ * et composition de sa propre équipe (allyAp : alliés surtout magiques, allyAd : surtout physiques).
+ */
+export const CONTEXTS = ['all', 'ap', 'ad', 'heal', 'tank', 'cc', 'allyAp', 'allyAd']
 
 const CONTEXT_METRICS = ['heal', 'tank', 'cc']
 /** Un contexte « fort » = au-dessus de ~75 % des parties (z-score > 0,67). */
@@ -65,7 +69,7 @@ export function emptyBacktest() {
     games: 0,
     variant: { followed: [0, 0], other: [0, 0] },
     items: { high: [0, 0], low: [0, 0] },
-    // Objet suivant (4e au 6e objet), à avance égale : voir nextItems.mjs.
+    // Objet suivant (3e au 6e objet), à avance égale : voir nextItems.mjs.
     next: emptyNextBacktest()
   }
 }
@@ -136,6 +140,7 @@ const CHAMP_MAPS = [
   'boots',
   'pet',
   'start',
+  'bootsT',
   'later',
   'skills',
   'vs',
@@ -163,17 +168,22 @@ function champState(state, champ) {
   c.opt ??= {}
   for (const k of CHOICE_KINDS) c.opt[k] ??= {}
   c.petVs ??= {}
+  // Choix face à l'adversaire direct : { type: { adversaire: { option: [g, w] } } } (voir oppRows).
+  c.optVs ??= {}
   c.duel ??= {}
   c.open ??= { g: 0, top: 0, firstN: 0, firstMin: 0, lanes: {} }
   // ARAM Mayhem : augments choisis avec ce champion { augment: [g, w] }.
   c.aug ??= {}
-  // Objet suivant (4e au 6e objet) : décisions avec leur victoire attendue (voir nextItems.mjs).
+  // Objet suivant (3e au 6e objet) : décisions avec leur victoire attendue (voir nextItems.mjs).
   c.nx ??= { '*': {}, a: {}, x: {} }
   return c
 }
 
-/** Choix mesurés par contexte adverse : page de runes, bottes, familier, ordre des compétences. */
-const CHOICE_KINDS = ['runes', 'boots', 'pet', 'skills']
+/**
+ * Choix mesurés par contexte : page de runes, bottes, familier, ordre des compétences, départ et
+ * moment des bottes (avant le 1er objet, entre le 1er et le 2e, après).
+ */
+const CHOICE_KINDS = ['runes', 'boots', 'pet', 'skills', 'start', 'bootsT']
 /** Périodes des combats entre junglers (minutes). */
 export const DUEL_PERIODS = ['early', 'mid', 'late']
 const periodOf = (min) => (min < 6 ? 'early' : min < 14 ? 'mid' : 'late')
@@ -240,9 +250,22 @@ export function expectedEnemy(profiles, foes, minGames = 20) {
   return out
 }
 
-/** Contextes adverses d'une partie, sans mettre à jour les statistiques (lecture seule). */
-export function classifyContexts(state, enemy) {
-  const ctx = ['all']
+/**
+ * Contextes de sa propre équipe (composition attendue des 4 alliés, voir expectedEnemy) : alliés
+ * surtout magiques ou surtout physiques. Un champion qui peut jouer AP ou AD (Kai'Sa, Varus…) doit
+ * en tenir compte.
+ */
+export function allyContexts(ally) {
+  if (!ally || !ally.minutes) return []
+  const dmg = ally.phys + ally.magic
+  if (!(dmg > 0)) return []
+  const ap = ally.magic / dmg
+  return ap >= 0.55 ? ['allyAp'] : ap <= 0.35 ? ['allyAd'] : []
+}
+
+/** Contextes d'une partie, sans mettre à jour les statistiques (lecture seule). */
+export function classifyContexts(state, enemy, ally = null) {
+  const ctx = ['all', ...allyContexts(ally)]
   if (!enemy || !enemy.minutes) return ctx
   const dmg = enemy.phys + enemy.magic
   if (dmg > 0) {
@@ -254,9 +277,9 @@ export function classifyContexts(state, enemy) {
   return ctx
 }
 
-/** Contextes adverses d'une partie (composition attendue, voir expectedEnemy). */
-export function contextsOf(state, enemy) {
-  const ctx = classifyContexts(state, enemy)
+/** Contextes d'une partie (compositions attendues, voir expectedEnemy). */
+export function contextsOf(state, enemy, ally = null) {
+  const ctx = classifyContexts(state, enemy, ally)
   if (enemy?.minutes) for (const m of CONTEXT_METRICS) observe(state, m, enemy[m] / enemy.minutes)
   return ctx
 }
@@ -273,6 +296,7 @@ export function addRecord(state, rec) {
   inc(c.boots, rec.boots === null ? null : String(rec.boots), rec.win)
   inc(c.pet, rec.pet === null ? null : String(rec.pet), rec.win)
   inc(c.start, rec.start ?? null, rec.win)
+  inc(c.bootsT, rec.bootsT ?? null, rec.win)
   inc(c.skills, rec.skills, rec.win)
   if (rec.enemyJungler) inc(c.vs, rec.enemyJungler, rec.win)
   for (const ally of rec.allies ?? []) inc(c.with, ally, rec.win)
@@ -306,7 +330,7 @@ export function addRecord(state, rec) {
     if (rec.runeSig) f.runes++
     if (rec.augments?.length) f.aug++
   }
-  const contexts = contextsOf(state, rec.enemy)
+  const contexts = contextsOf(state, rec.enemy, rec.ally)
   const items = rec.items ?? []
   for (const ctx of contexts) {
     inc(c.ctxBase, ctx, rec.win)
@@ -327,11 +351,27 @@ export function addRecord(state, rec) {
     runes: rec.runeSig,
     boots: rec.boots === null ? null : String(rec.boots),
     pet: rec.pet === null ? null : String(rec.pet),
-    skills: rec.skills
+    skills: rec.skills,
+    start: rec.start ?? null,
+    bootsT: rec.bootsT ?? null
   }
   for (const kind of CHOICE_KINDS)
     for (const ctx of contexts) inc((c.opt[kind][ctx] ??= {}), choice[kind], rec.win)
-  if (rec.enemyJungler) inc((c.petVs[rec.enemyJungler] ??= {}), choice.pet, rec.win)
+  // Face à l'adversaire direct : départ, bottes, clé de voûte, famille (1er objet), moment des
+  // bottes ; le familier selon le jungler adverse (petVs).
+  const opp = rec.enemyJungler
+  if (opp) {
+    inc((c.petVs[opp] ??= {}), choice.pet, rec.win)
+    const vsValues = {
+      start: choice.start,
+      boots: choice.boots,
+      keystone: rec.runeSig ? keystoneOf(rec.runeSig) : null,
+      fam: rec.core.length >= 1 ? String(rec.core[0]) : null,
+      bootsT: choice.bootsT
+    }
+    for (const [kind, value] of Object.entries(vsValues))
+      if (value) inc(((c.optVs[kind] ??= {})[opp] ??= {}), value, rec.win)
+  }
 
   // Combats contre le jungler adverse, par période.
   for (const d of rec.duels ?? []) {
@@ -864,7 +904,12 @@ function contextRates(byCtx, value) {
  * contexte adverse. `describe` transforme la valeur brute (signature de runes, identifiant
  * d'objet…) pour l'app, ou renvoie null si elle n'est pas valide.
  */
-function choiceList(totals, byCtx, describe, { minShare = 0.08, minGames = 20, max = 4 } = {}) {
+function choiceList(
+  totals,
+  byCtx,
+  describe,
+  { minShare = 0.08, minGames = 20, max = 4, opp = null } = {}
+) {
   const entries = Object.entries(totals ?? {})
   const total = entries.reduce((s, [, [g]]) => s + g, 0)
   if (total <= 0) return []
@@ -874,49 +919,109 @@ function choiceList(totals, byCtx, describe, { minShare = 0.08, minGames = 20, m
     .map(([value, [g, w]]) => {
       const desc = describe(value)
       if (!desc) return null
+      const vs = opp ? opp(value) : null
       return {
         ...desc,
         games: Math.round(g),
         winRate: round3(w / g),
         share: round3(g / total),
-        contexts: contextRates(byCtx, value)
+        contexts: contextRates(byCtx, value),
+        ...(vs && Object.keys(vs).length ? { opp: vs } : {})
       }
     })
     .filter(Boolean)
     .slice(0, max)
 }
 
+/** Écart face à un adversaire publié seulement à partir de 0,3 point (déjà lissé). */
+const MIN_OPP_EFFECT = 0.003
+const round4 = (x) => Math.round(x * 10000) / 10000
+
 /**
- * Choix d'un champion mesurés par contexte adverse : pages de runes, bottes, familier (aussi
- * selon le jungler adverse) et ordre des compétences. Un choix n'apparaît que s'il a au moins
- * deux options courantes.
+ * Écarts propres face à chaque adversaire direct, lissés avec la force mesurée (priors.choiceVs) :
+ * fonction (type, option) → { adversaire: [parties, écart] }, seulement les écarts établis.
  */
-export function buildChoices(c, dd) {
+export function oppEffects(c, k = DEFAULT_PRIORS.choiceVs) {
+  const index = new Map()
+  for (const r of oppRows(c)) {
+    const x = posterior(r.n, r.d, k)
+    if (Math.abs(x) < MIN_OPP_EFFECT) continue
+    const key = `${r.kind}|${r.value}`
+    const m = index.get(key) ?? {}
+    m[r.opp] = [Math.round(r.n), round4(x)]
+    index.set(key, m)
+  }
+  return (kind, value) => index.get(`${kind}|${value}`) ?? null
+}
+
+/**
+ * Choix d'un champion mesurés par contexte (composition adverse et alliée) et face à l'adversaire
+ * direct (`opp`) : pages de runes (par clé de voûte face à l'adversaire), bottes, familier, ordre
+ * des compétences, départ et moment des bottes. Un choix n'apparaît que s'il a au moins deux
+ * options courantes.
+ */
+export function buildChoices(c, dd, priors = DEFAULT_PRIORS) {
   const itemName = (id) => dd.items.get(Number(id))?.name ?? null
+  const opp = oppEffects(c, priors?.choiceVs ?? DEFAULT_PRIORS.choiceVs)
   const out = {}
-  const runes = choiceList(c.runes, c.opt?.runes, (sig) => {
-    const r = runesFromSig(sig, dd)
-    return r ? { runes: r } : null
-  })
+  const runes = choiceList(
+    c.runes,
+    c.opt?.runes,
+    (sig) => {
+      const r = runesFromSig(sig, dd)
+      return r ? { runes: r } : null
+    },
+    { opp: (sig) => opp('keystone', keystoneOf(sig)) }
+  )
   if (runes.length >= 2) out.runes = runes
-  const boots = choiceList(c.boots, c.opt?.boots, (id) => {
-    const n = itemName(id)
-    return n ? { name: n } : null
-  })
+  const boots = choiceList(
+    c.boots,
+    c.opt?.boots,
+    (id) => {
+      const n = itemName(id)
+      return n ? { name: n } : null
+    },
+    { opp: (id) => opp('boots', id) }
+  )
   if (boots.length >= 2) out.boots = boots
-  const pet = choiceList(c.pet, c.opt?.pet, (id) => {
-    const n = itemName(id)
-    if (!n) return null
-    const vs = {}
-    for (const [enemy, map] of Object.entries(c.petVs ?? {})) {
-      const cell = map?.[id]
-      if (cell && cell[0] >= 10) vs[enemy] = [Math.round(cell[0]), round3(cell[1] / cell[0])]
-    }
-    return { name: n, vs }
-  })
+  const pet = choiceList(
+    c.pet,
+    c.opt?.pet,
+    (id) => {
+      const n = itemName(id)
+      if (!n) return null
+      const vs = {}
+      for (const [enemy, map] of Object.entries(c.petVs ?? {})) {
+        const cell = map?.[id]
+        if (cell && cell[0] >= 10) vs[enemy] = [Math.round(cell[0]), round3(cell[1] / cell[0])]
+      }
+      return { name: n, vs }
+    },
+    { opp: (id) => opp('pet', id) }
+  )
   if (pet.length >= 2) out.pet = pet
   const skills = choiceList(c.skills, c.opt?.skills, (v) => (v ? { value: v } : null))
   if (skills.length >= 2) out.skills = skills
+  // Départ (anneau de Doran, lame de Doran, larme…) : selon la partie et l'adversaire direct.
+  const start = choiceList(
+    c.start,
+    c.opt?.start,
+    (sig) => {
+      const items = String(sig)
+        .split(',')
+        .map((id) => itemName(id))
+        .filter(Boolean)
+      return items.length ? { items } : null
+    },
+    { opp: (sig) => opp('start', sig), max: 3 }
+  )
+  if (start.length >= 2) out.start = start
+  // Moment des bottes : avant le 1er objet (early), entre le 1er et le 2e (first), après (later).
+  const bootsT = choiceList(c.bootsT, c.opt?.bootsT, (v) => (v ? { value: v } : null), {
+    opp: (v) => opp('bootsT', v),
+    max: 3
+  })
+  if (bootsT.length >= 2) out.bootsT = bootsT
   return out
 }
 
@@ -927,6 +1032,8 @@ export function buildChoices(c, dd) {
  */
 export function buildVariants(champ, c, dd, { minGames = 40, priors, allowNoRunes = false } = {}) {
   const variants = []
+  // Famille face à l'adversaire direct (1er objet), et clé de voûte des pages de la famille.
+  const opp = oppEffects(c, priors?.choiceVs ?? DEFAULT_PRIORS.choiceVs)
   const fams = Object.entries(c.fam ?? {}).sort((a, b) => b[1].g - a[1].g)
   for (const [first, f] of fams) {
     if (f.g < Math.max(30, minGames * 0.6) || f.g / c.g < 0.12) continue
@@ -936,12 +1043,19 @@ export function buildVariants(champ, c, dd, { minGames = 40, priors, allowNoRune
     const contexts = {}
     for (const [ctx, [g, w]] of Object.entries(f.ctxBase ?? {}))
       if (g >= 10) contexts[ctx] = [Math.round(g), round3(w / g)]
-    const runeChoices = choiceList(f.runes, f.ctxRunes, (sig) => {
-      const r = runesFromSig(sig, dd)
-      return r ? { runes: r } : null
-    })
+    const runeChoices = choiceList(
+      f.runes,
+      f.ctxRunes,
+      (sig) => {
+        const r = runesFromSig(sig, dd)
+        return r ? { runes: r } : null
+      },
+      { opp: (sig) => opp('keystone', keystoneOf(sig)) }
+    )
+    const vs = opp('fam', first)
     variants.push({
       ...(runeChoices.length >= 2 ? { runeChoices } : {}),
+      ...(vs ? { opp: vs } : {}),
       key: b.core[0],
       archetype: b.archetype,
       pet: b.pet,
@@ -1220,7 +1334,7 @@ export function buildMeta(state, dd0, previousMeta, options = {}) {
     if (!b) continue
     const variants = buildVariants(champ, c, dd, opts)
     if (variants.length) b.variants = variants
-    const choices = buildChoices(c, dd)
+    const choices = buildChoices(c, dd, priors)
     if (Object.keys(choices).length) b.choices = choices
     // Hors jungle : pas de familier.
     if (options.role && options.role !== 'jungle') {

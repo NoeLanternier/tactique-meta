@@ -30,7 +30,7 @@ export const TUNING_KEYS = [
 ]
 const P = TUNING_KEYS.length + 1 // + constante
 
-const CONTEXT_KEYS = ['ap', 'ad', 'heal', 'tank', 'cc']
+const CONTEXT_KEYS = ['ap', 'ad', 'heal', 'tank', 'cc', 'allyAp', 'allyAd']
 /** Effet cumulé maximal des alliés et adversaires, en points de taux de victoire. */
 const PAIR_CAP = 0.06
 /**
@@ -175,27 +175,42 @@ export function tuningFeatures(meta, rec, contexts, dd) {
       const base = smooth(family.games, family.winRate, prior, P.fam)
       f.famBase = base - prior
       f.famCtx = contextShift(family.contexts, base, contexts, P.famCtx)
+      // Face à l'adversaire direct (écart propre publié déjà lissé).
+      if (rec.enemyJungler) f.famCtx += family.opp?.[rec.enemyJungler]?.[1] ?? 0
     }
   }
 
-  // Runes, bottes, familier, compétences jouées.
+  // Runes, bottes, familier, compétences, départ et moment des bottes joués.
+  const startNames = rec.start
+    ? String(rec.start)
+        .split(',')
+        .map((id) => itemName(id))
+        .filter(Boolean)
+        .join(',')
+    : null
   const played = {
     runes: rec.runeSig ? JSON.stringify(runesFromSig(rec.runeSig, dd)) : null,
     boots: itemName(rec.boots),
     pet: itemName(rec.pet),
-    skills: rec.skills ?? null
+    skills: rec.skills ?? null,
+    start: startNames || null,
+    bootsT: rec.bootsT ?? null
   }
   const lists = {
     runes: family?.runeChoices ?? build.choices?.runes,
     boots: build.choices?.boots,
     pet: build.choices?.pet,
-    skills: build.choices?.skills
+    skills: build.choices?.skills,
+    start: build.choices?.start,
+    bootsT: build.choices?.bootsT
   }
   const valueOf = {
     runes: (o) => JSON.stringify(o.runes),
     boots: (o) => o.name,
     pet: (o) => o.name,
-    skills: (o) => o.value
+    skills: (o) => o.value,
+    start: (o) => (o.items ?? []).join(','),
+    bootsT: (o) => o.value
   }
   for (const kind of Object.keys(lists)) {
     const list = lists[kind]
@@ -207,8 +222,12 @@ export function tuningFeatures(meta, rec, contexts, dd) {
     const base = smooth(o.games, o.winRate, ref, P[kind])
     f.choiceBase += base - ref
     f.choiceCtx += contextShift(o.contexts, base, contexts, P.choiceCtx)
-    const vs = kind === 'pet' && rec.enemyJungler ? o.vs?.[rec.enemyJungler] : null
-    if (vs) f.choiceCtx += smooth(vs[0], vs[1], base, P.choiceCtx) - base
+    // Face à l'adversaire direct : écart propre publié (déjà lissé) ; ancien taux brut du familier
+    // pour les métas qui ne publient pas encore `opp`.
+    const opp = rec.enemyJungler ? o.opp?.[rec.enemyJungler] : null
+    const vs = !o.opp && kind === 'pet' && rec.enemyJungler ? o.vs?.[rec.enemyJungler] : null
+    if (opp) f.choiceCtx += opp[1]
+    else if (vs) f.choiceCtx += smooth(vs[0], vs[1], base, P.choiceCtx) - base
   }
 
   // Objets achetés face aux adversaires présents et à leurs objets.
