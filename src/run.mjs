@@ -538,7 +538,8 @@ async function main() {
       if (slot.role === mainRole) profiles = meta.profiles
       else if (profiles) meta.profiles = profiles
       if (slot.role === mainRole && bracket.key === 'master') srPublishedProfiles = meta.profiles
-      writeFileSync(slot.metaFile, JSON.stringify(meta, null, 2) + '\n')
+      // Sans mise en page : environ 65 % plus léger à télécharger pour l'app.
+      writeFileSync(slot.metaFile, JSON.stringify(meta) + '\n')
 
       const L = `[${slot.label}]`
       const mb = (json.length / 1e6).toFixed(1)
@@ -584,7 +585,7 @@ async function main() {
     meta.role = run.mode
     meta.contexts = CONTEXT_KIND
     if (Object.keys(meta.profiles ?? {}).length < 50 && srProfiles) meta.profiles = srProfiles
-    writeFileSync(run.metaFile, JSON.stringify(meta, null, 2) + '\n')
+    writeFileSync(run.metaFile, JSON.stringify(meta) + '\n')
     const mb = (json.length / 1e6).toFixed(1)
     log(
       `${L} ${run.records} joueurs ajoutés, ${meta.sampleGames} sur le patch, ${meta.freshBuilds} builds à jour (état : ${mb} Mo).`
