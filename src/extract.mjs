@@ -368,10 +368,15 @@ export function extractPlayers(match, timeline, dd, roles = ROLES, mode = null) 
       later: legendaries.slice(3, 6),
       items: legendaries.slice(0, 6),
       itemMin: legendaryMin.slice(0, 6),
-      // État de la partie à chaque achat : en avance ('a'), à égalité ('e'), en retard ('b').
+      // État de la partie à chaque achat : en avance ('a'), à égalité ('e'), en retard ('b') ; et
+      // écart d'or exact entre les équipes (part de l'or adverse), pour la victoire attendue.
       itemState: legendaryMin
         .slice(0, 6)
         .map((min) => stateOfLead(leadAt(timeline, teamOf, p.teamId, min))),
+      itemLead: legendaryMin.slice(0, 6).map((min) => {
+        const lead = leadAt(timeline, teamOf, p.teamId, min)
+        return lead === null ? null : Math.round(lead * 1000) / 1000
+      }),
       boots,
       pet,
       start: start.length ? start.join(',') : null,

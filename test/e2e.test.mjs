@@ -80,6 +80,13 @@ test('collecte complète : Master+ et Or à Émeraude, puis réglage le lendemai
   assert.match(first.stdout, /\[URF\] terminé : 0 nouvelles parties/)
   assert.match(first.stdout, /modes \d+\)/)
 
+  // Objet suivant (4e et 5e objets) : mesures publiées et courbe de victoire selon l'avance.
+  const lee2 = master.builds.find((b) => b.id === 'LeeSin')
+  assert.ok(Object.keys(lee2.next.base).includes('Guardian Angel'), JSON.stringify(lee2.next))
+  assert.ok(lee2.next.after['Guardian Angel'] || lee2.next.after['Edge of Night'])
+  assert.equal(master.lead.p['3'].length, 7)
+  assert.equal(master.nextModel.measured, false)
+
   // Le lendemain (mêmes parties déjà vues) : la méta de la veille sert au backtest et au réglage.
   const second = run({ MOCK_DAY: '2' })
   assert.equal(second.status, 0, second.stdout + second.stderr)
@@ -89,6 +96,10 @@ test('collecte complète : Master+ et Or à Émeraude, puis réglage le lendemai
   assert.match(second.stdout, /\[Master\+ · top\] réglage du moteur : 1200 parties/)
   assert.match(second.stdout, /\[Or à Émeraude\] réglage du moteur : 400 parties/)
   assert.match(second.stdout, /\[Master\+\] backtest/)
+  // Conseils d'objet suivant de la veille jugés sur les parties du jour.
+  const day2 = JSON.parse(readFileSync(join(out, 'meta.json'), 'utf-8'))
+  assert.ok(day2.backtest.next.decisions > 0, JSON.stringify(day2.backtest))
+  assert.equal(day2.backtest.next.gammas.length, 5)
   // Les parties déjà vues ne sont pas recomptées.
   const third = run({ MOCK_DAY: '2' })
   assert.match(third.stdout, /\[Master\+\] terminé : 0 nouvelles parties/)

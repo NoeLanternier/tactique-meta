@@ -15,6 +15,15 @@ import {
   pooledItemLifts
 } from './priors.mjs'
 import { legendaryOn } from './ddragon.mjs'
+import {
+  addNext,
+  buildNext,
+  emptyNextBacktest,
+  nextBacktestSummary,
+  nextModel,
+  pooledNext,
+  publishLead
+} from './nextItems.mjs'
 import { MODES } from './modes.mjs'
 
 export const STATE_VERSION = 7
@@ -55,7 +64,9 @@ export function emptyBacktest() {
     v: 2,
     games: 0,
     variant: { followed: [0, 0], other: [0, 0] },
-    items: { high: [0, 0], low: [0, 0] }
+    items: { high: [0, 0], low: [0, 0] },
+    // Objet suivant (4e au 6e objet), à avance égale : voir nextItems.mjs.
+    next: emptyNextBacktest()
   }
 }
 
@@ -106,6 +117,8 @@ export function upgradeState(state) {
   state.itemFoe ??= {}
   state.foeAll ??= {}
   state.backtest ??= emptyBacktest()
+  state.backtest.next ??= emptyNextBacktest()
+  state.lead ??= {}
   // Critères du réglage changés (voir TUNING_VERSION) : il repart de zéro.
   if (state.tuning?.v !== TUNING_VERSION) state.tuning = emptyTuning()
   state.bans ??= { games: 0, champs: {} }
@@ -154,6 +167,8 @@ function champState(state, champ) {
   c.open ??= { g: 0, top: 0, firstN: 0, firstMin: 0, lanes: {} }
   // ARAM Mayhem : augments choisis avec ce champion { augment: [g, w] }.
   c.aug ??= {}
+  // Objet suivant (4e au 6e objet) : décisions avec leur victoire attendue (voir nextItems.mjs).
+  c.nx ??= { '*': {}, a: {}, x: {} }
   return c
 }
 
@@ -298,6 +313,8 @@ export function addRecord(state, rec) {
     const present = (c.ctxItems[ctx] ??= {})
     for (const id of items) inc(present, String(id), rec.win)
   }
+  // 4e au 6e objet : chaque achat comparé aux autres décisions prises au même moment.
+  addNext(state, c, rec, contexts)
   // Objet au k-ième rang, selon l'état de la partie à l'achat : comparé ensuite aux autres objets
   // achetés au même rang et dans le même état.
   items.forEach((id, k) => {
@@ -420,6 +437,8 @@ export function seedFromPrevious(state, previous, factor = 0.25) {
   state.itemFoe = scaleDeep(previous.itemFoe ?? {}, factor)
   state.foeAll = scaleDeep(previous.foeAll ?? {}, factor)
   state.ctxStats = previous.ctxStats ?? {}
+  // Courbe de victoire selon l'avance à chaque achat (rapprochée de 50 % par le petit nombre).
+  state.lead = scaleDeep(previous.lead ?? {}, factor)
   state.bans = previous.bans ? scaleDeep(previous.bans, factor) : { games: 0, champs: {} }
   // (le numéro de version n'est pas un compteur : il n'est pas multiplié.)
   state.tuning =
@@ -589,7 +608,7 @@ export function selectBuild(
   champ,
   c,
   dd,
-  { minGames = 40, priors = DEFAULT_PRIORS, pooled, allowNoRunes = false } = {}
+  { minGames = 40, priors = DEFAULT_PRIORS, pooled, nextPooled, allowNoRunes = false } = {}
 ) {
   if (!c || c.g < minGames) return null
   const prior = c.w / c.g
@@ -675,6 +694,10 @@ export function selectBuild(
     ...(startOptions.length ? { startOptions } : {}),
     runes,
     situational: situationalStats(c, dd, { priors: P, pooled }),
+    ...(() => {
+      const next = buildNext(c, dd, P, nextPooled)
+      return next ? { next } : {}
+    })(),
     patch: dd.patch,
     games: Math.round(c.g),
     winRate: round3(prior)
@@ -1004,11 +1027,13 @@ const rateOf = ([g, w]) => (g > 0 ? round3(w / g) : null)
 export function backtestSummary(bt) {
   if (!bt || bt.games === 0) return null
   const cell = (x) => ({ games: Math.round(x[0]), winRate: rateOf(x) })
+  const next = nextBacktestSummary(bt.next)
   return {
     v: 2,
     games: bt.games,
     variant: { followed: cell(bt.variant.followed), other: cell(bt.variant.other) },
-    items: { high: cell(bt.items.high), low: cell(bt.items.low) }
+    items: { high: cell(bt.items.high), low: cell(bt.items.low) },
+    ...(next ? { next } : {})
   }
 }
 
@@ -1187,8 +1212,9 @@ export function buildMeta(state, dd0, previousMeta, options = {}) {
   // (options.evidence : mesure regroupée de tous les postes, voir poolEvidence.)
   const priors = measurePriors(state, options.evidence ?? null)
   const pooled = pooledItemLifts(state)
+  const nextPooled = pooledNext(state)
   // (modes : un build peut se passer de runes, désactivées en ARAM Mayhem.)
-  const opts = { ...options, priors, pooled, allowNoRunes: !!mode }
+  const opts = { ...options, priors, pooled, nextPooled, allowNoRunes: !!mode }
   for (const [champ, c] of Object.entries(state.champs)) {
     const b = selectBuild(champ, c, dd, opts)
     if (!b) continue
@@ -1269,6 +1295,11 @@ export function buildMeta(state, dd0, previousMeta, options = {}) {
     threats: buildThreats(state),
     itemCounters: buildItemCounters(state, dd),
     backtest: backtestSummary(state.backtest),
+    // Objet suivant : victoire attendue selon l'avance, et modèle vérifié par le backtest.
+    ...(() => {
+      const lead = publishLead(state)
+      return lead ? { lead, nextModel: nextModel(state.backtest?.next) } : {}
+    })(),
     // Réglage automatique des poids du moteur de l'app (voir tuning.mjs).
     tuning:
       solveTuning(state.tuning) ??

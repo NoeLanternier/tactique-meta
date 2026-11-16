@@ -543,6 +543,7 @@ async function main() {
       log(`${L} lissages mesurés (parties a priori) : ${JSON.stringify(meta.priors)}`)
       if (meta.fit) log(`${L} équilibre de l'équipe : ${JSON.stringify(meta.fit)}`)
       if (meta.backtest) log(`${L} backtest : ${JSON.stringify(meta.backtest)}`)
+      if (meta.nextModel) log(`${L} objet suivant : ${JSON.stringify(meta.nextModel)}`)
       if (meta.tuning) log(`${L} réglage du moteur : ${JSON.stringify(meta.tuning)}`)
       else log(`${L} réglage du moteur : ${Math.round(state.tuning.n)} parties (il en faut 2000)`)
     }

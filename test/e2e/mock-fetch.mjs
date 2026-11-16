@@ -45,7 +45,11 @@ const ddragon = {
       6692: item('Eclipse', 2900, { stats: { FlatPhysicalDamageMod: 60 } }),
       3071: item('Black Cleaver', 3000, { stats: { FlatPhysicalDamageMod: 40 } }),
       6333: item("Death's Dance", 3300, { stats: { FlatPhysicalDamageMod: 60, FlatArmorMod: 50 } }),
-      6610: item('Sundered Sky', 3100, { stats: { FlatPhysicalDamageMod: 40 } })
+      6610: item('Sundered Sky', 3100, { stats: { FlatPhysicalDamageMod: 40 } }),
+      // Objets tardifs (4e et 5e) : trois choix, pour l'objet suivant.
+      3026: item('Guardian Angel', 3200, { stats: { FlatPhysicalDamageMod: 55 } }),
+      3156: item('Maw of Malmortius', 3100, { stats: { FlatPhysicalDamageMod: 60 } }),
+      3814: item('Edge of Night', 2900, { stats: { FlatPhysicalDamageMod: 50 } })
     }
   },
   '/cdn/16.21.1/data/en_US/runesReforged.json': [
@@ -76,6 +80,7 @@ function match(id) {
   const aram = queue !== 420
   const win = rand() < 0.5
   const core = rand() < 0.5 ? [6692, 3071, 6333] : [6610, 3071, 6333]
+  const lates = [3026, 3156, 3814].sort(() => rand() - 0.5)
   const keystone = rand() < 0.6 ? 8010 : 8008
   const page = {
     statPerks: { offense: 5005, flex: 5008, defense: 5001 },
@@ -104,14 +109,16 @@ function match(id) {
     magicDamageDealtToChampions: 5000 + rand() * 20000,
     totalHeal: 3000, damageSelfMitigated: 15000, totalDamageTaken: 20000, timeCCingOthers: 20,
     totalDamageShieldedOnTeammates: 0, kills: 4, assists: 6, visionScore: 30, visionWardsBoughtInGame: 4,
-    item0: core[0], item1: core[1], item2: core[2]
+    item0: core[0], item1: core[1], item2: core[2], item3: lates[0], item4: lates[1]
   }))
   const buys = (pid) => broken ? [] : [
     { type: 'ITEM_PURCHASED', participantId: pid, itemId: 1101, timestamp: 1000 },
     { type: 'ITEM_PURCHASED', participantId: pid, itemId: core[0], timestamp: 600000 },
     { type: 'ITEM_PURCHASED', participantId: pid, itemId: rand() < 0.5 ? 3047 : 3111, timestamp: 700000 },
     { type: 'ITEM_PURCHASED', participantId: pid, itemId: core[1], timestamp: 900000 },
-    { type: 'ITEM_PURCHASED', participantId: pid, itemId: core[2], timestamp: 1200000 }
+    { type: 'ITEM_PURCHASED', participantId: pid, itemId: core[2], timestamp: 1200000 },
+    { type: 'ITEM_PURCHASED', participantId: pid, itemId: lates[0], timestamp: 1400000 },
+    { type: 'ITEM_PURCHASED', participantId: pid, itemId: lates[1], timestamp: 1650000 }
   ]
   const skills = (pid) => 'QWEQQRQEQEREEWW'.split('').map((k, i) => ({
     type: 'SKILL_LEVEL_UP', participantId: pid, skillSlot: ' QWER'.indexOf(k), levelUpType: 'NORMAL', timestamp: 60000 * (i + 1)

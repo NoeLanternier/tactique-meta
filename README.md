@@ -69,8 +69,9 @@ soigne et encaisse davantage : les valeurs observées liaient le contexte à l'i
    parties, taux de victoire de leur équipe, taux de ban), pour les conseils de ban.
 10. **Backtest** : chaque nouvelle partie est comparée à la méta précédente avant d'être ajoutée
     (famille recommandée suivie ou non ; chaque achat du 4e au 6e objet parmi les objets
-    conseillés à ce moment, ou non, comparés au même rang). Le taux de victoire des deux groupes
-    est publié dans `meta.json` (`backtest`) et dans le journal.
+    conseillés à ce moment, ou non, comparés au même rang ; et le conseil d'objet suivant, à or
+    égal, voir « Objet suivant »). Le taux de victoire des groupes est publié dans `meta.json`
+    (`backtest`) et dans le journal.
 11. Mesure par contexte adverse les **options courantes** de chaque champion (pages de runes, aussi
     par famille de build ; bottes ; familier, aussi selon le jungler adverse ; ordre des
     compétences) : l'app garde le choix du build sauf si une autre option gagne nettement plus.
@@ -151,6 +152,47 @@ synergies avec un allié ne le sont pas (z = 0,7).
 Validation hors échantillon (parties du 10 et 11 novembre prédites avec la méta du 9) : avec
 l'ancien lissage fixe, l'effet prédit d'un affrontement direct était 4 à 20 fois trop fort, et la
 prédiction était moins bonne que de ne rien prédire ; avec le lissage mesuré, elle est calibrée.
+
+## Objet suivant (4e au 6e objet)
+
+Le build conseillé ne s'arrête pas aux trois objets du cœur : chaque achat du 4e au 6e objet
+légendaire est mesuré **selon ce qui est déjà possédé et selon la partie**, à **or égal**
+(`src/nextItems.mjs`, publié dans `builds[].next`).
+
+- **À or égal.** Un objet acheté surtout en menant gagne souvent… parce qu'on menait. Chaque achat
+  est donc comparé à la victoire attendue selon l'écart d'or de l'équipe à ce moment (courbe par
+  rang et par tranche d'écart, publiée dans `lead`) : seules les victoires en plus comptent.
+- **Après les objets possédés.** Pour chaque objet déjà acheté, l'écart d'un objet suivant par
+  rapport à son écart habituel (interaction), pondéré par ce que cet objet distingue : un objet que
+  presque tout le monde a déjà ne dit rien de plus. Un objet presque jamais pris après un objet
+  possédé (moins de 5 achats sur au moins 300) est écarté.
+- **Selon la partie.** Mêmes interactions avec la composition adverse (dégâts magiques ou
+  physiques, soins, résistance, contrôles) et avec l'avance ou le retard au moment de l'achat.
+- **Lissage mesuré**, comme le reste (`priors.nx0`, `nxJ`, `nxC`) : l'écart propre est rapproché
+  de l'écart moyen de l'objet sur tous les champions, les interactions sont rapprochées de 0.
+
+L'app reprend la même estimation (`engine/nextItems.ts`, vérifiée par un test de parité) et choisit
+les objets un par un : le suivant est celui qui gagne le plus après les objets déjà prévus,
+corrigé par les besoins de la partie (règles, adversaires précis, tes parties).
+
+**Preuve hors échantillon.** Chaque nuit, avant d'ajouter les nouvelles parties, chaque achat du
+4e au 6e objet est comparé au conseil de la méta de la veille (`backtest.next` dans `meta.json`) :
+
+- victoires en plus des achats conformes au conseil moins celles des autres achats (`gain`, avec
+  son erreur type `se`), pour plusieurs poids de la popularité (`gamma` : part des joueurs qui
+  prennent l'objet après les mêmes objets, de 0 à 1) ;
+- calibration : victoires en plus observées par point d'écart prévu (1 : prévisions exactes) ;
+- l'ancien conseil (objets les plus construits selon le contexte), jugé de la même façon (`old`).
+
+Dès 1 000 achats vérifiés, `nextModel` publie le poids de popularité qui a le mieux réussi et la
+pente de calibration (rapprochée de 1 selon son incertitude, bornée entre 0 et 2) : l'app multiplie
+les écarts par cette pente. Si les écarts ne se vérifient pas le lendemain (pente proche de 0), les
+règles reprennent la main et l'app n'affiche plus d'explication tirée de ces mesures. Le résultat
+est affiché dans l'app (Réglages, « Qualité du moteur », et Bilan, « L'app t'aide-t-elle ? »).
+
+Mesure sur les vraies parties avant ce modèle (backtest publié par les six métas) : acheter un
+des trois objets les plus construits selon le contexte ne gagnait pas plus que les autres achats
+(de −0,5 à +0,8 point selon la méta), d'où ce modèle.
 
 ## Modes : ARAM, modes temporaires (et ARAM Mayhem)
 

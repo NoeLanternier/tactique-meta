@@ -11,6 +11,7 @@ import {
   popularitySlope,
   posterior
 } from './stats.mjs'
+import { nextCells } from './nextItems.mjs'
 
 /** États de la partie au moment d'un achat : en avance, à égalité, en retard (or des équipes). */
 export const STATES = ['a', 'e', 'b']
@@ -48,6 +49,10 @@ export const DEFAULT_PRIORS = {
   c3: 1000,
   slot: 1000,
   choiceCtx: 3000,
+  // Objet suivant (voir nextItems.mjs) : écart propre au champion, après un objet, par contexte.
+  nx0: 3000,
+  nxJ: 5000,
+  nxC: 5000,
   counter: K_MAX,
   trait: K_MAX
 }
@@ -121,7 +126,10 @@ const FAMILIES = [
   'c2',
   'c3',
   'slot',
-  'choiceCtx'
+  'choiceCtx',
+  'nx0',
+  'nxJ',
+  'nxC'
 ]
 
 /** Cellules [parties, écart, variance] de chaque famille de statistiques, et correction du hasard. */
@@ -213,6 +221,8 @@ function priorCells(state) {
       }
     }
   }
+  // Objet suivant : écarts propres (au champion, après un objet, par contexte).
+  Object.assign(cells, nextCells(state))
   return { cells, scale: noiseScale(cells.with) }
 }
 

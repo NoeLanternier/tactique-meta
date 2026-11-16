@@ -9,12 +9,17 @@
 //   avantagerait ceux qui ont peu d'objets (les parties gagnées vite), ce qui faussait l'ancienne
 //   mesure.
 //
+// - Objet suivant : chaque achat du 4e au 6e objet comparé au premier conseil de la veille, en
+//   victoires en plus par rapport à la victoire attendue selon l'écart d'or à cet achat (voir
+//   nextItems.mjs), avec l'ancien conseil jugé de la même façon pour comparaison.
+//
 // C'est une mesure indirecte (les joueurs qui suivent la méta ne sont pas forcément les mêmes que
 // les autres), mais elle permet de vérifier collecte après collecte que les changements vont dans
 // le bon sens : l'écart entre « suivi » et « autre » doit rester positif.
 
 import { DEFAULT_PRIORS } from './priors.mjs'
 import { posterior } from './stats.mjs'
+import { evaluateNext } from './nextItems.mjs'
 
 /** Famille recommandée pour une partie : meilleur taux estimé dans les contextes de la partie. */
 export function recommendedVariant(build, contexts, priors = DEFAULT_PRIORS) {
@@ -83,5 +88,7 @@ export function evaluateRecord(meta, contexts, rec, bt, dd) {
     inc(wanted.includes(items[k]) ? bt.items.high : bt.items.low, rec.win)
     counted = true
   }
+  // Objet suivant (4e au 6e objet) : conseil de la veille, à avance égale (voir nextItems.mjs).
+  if (bt.next && evaluateNext(meta, contexts, rec, bt.next, dd, recommendedItems)) counted = true
   if (counted) bt.games++
 }
