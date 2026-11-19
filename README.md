@@ -43,8 +43,11 @@ soigne et encaisse davantage : les valeurs observées liaient le contexte à l'i
    son avantage est établi. Pour les runes, la clé de voûte est choisie d'abord (toutes ses pages
    réunies), puis la meilleure page de cette clé.
 5. Mesure le vrai profil de chaque champion, tous postes confondus (part de dégâts magiques,
-   résistance, contrôles, soins, boucliers), et la performance des objets selon le contexte adverse
-   (équipe très AP, très AD, beaucoup de soins, très résistante, beaucoup de contrôles).
+   résistance, contrôles, soins, boucliers, objets critiques et de vitesse d'attaque, part magique
+   habituelle de ses objets), et la performance des objets selon le contexte adverse (équipe très
+   AP, très AD, beaucoup de soins, très résistante, beaucoup de contrôles). En partie, l'app compare
+   les vrais objets de chaque adversaire à ce profil : un build inhabituel (Miss Fortune létalité,
+   Varus AP) change l'analyse au fur et à mesure de ses achats.
 6. Calcule le taux de victoire de chaque jungler, de chaque affrontement de junglers, avec chaque
    champion allié et contre chaque adversaire, selon la composition adverse (équipe très AP, très
    AD, soins, résistante, contrôles), et son taux de bannissement (conseils de pick et de ban dans
@@ -63,7 +66,7 @@ soigne et encaisse davantage : les valeurs observées liaient le contexte à l'i
    choisit la famille adaptée à la partie, puis suit celle qui a été commencée.
 9. Mesure, tous champions du poste confondus, chaque objet **face à chaque champion adverse et
    face aux objets adverses** (anti-soins, dégâts en % des PV, boucliers, stase / anti-sorts,
-   pénétration, armure, RM, vol de vie), en retirant l'effet que cet adversaire a sur tout le
+   pénétration, armure, RM, vol de vie, critiques), en retirant l'effet que cet adversaire a sur tout le
    monde. Ces écarts sont publiés déjà lissés, et seulement s'ils dépassent 0,4 point. Publie
    aussi tous les champions vus dans l'équipe adverse, quel que soit leur poste (`threats` :
    parties, taux de victoire de leur équipe, taux de ban), pour les conseils de ban.

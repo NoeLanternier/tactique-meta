@@ -36,6 +36,7 @@ export function itemTraits(desc, stats) {
   if ((stats.FlatArmorMod ?? 0) >= 40) t.push('armor')
   if ((stats.FlatSpellBlockMod ?? 0) >= 40) t.push('mr')
   if ((stats.PercentLifeStealMod ?? 0) > 0 || /omnivamp|life ?steal/.test(desc)) t.push('lifesteal')
+  if ((stats.FlatCritChanceMod ?? 0) > 0) t.push('crit')
   return t
 }
 

@@ -11,7 +11,9 @@ import {
   oppEffects
 } from '../src/aggregate.mjs'
 import { recommendedVariant } from '../src/backtest.mjs'
-import { bootsTiming, fedAt } from '../src/extract.mjs'
+import { bootsTiming, extractProfiles, fedAt, foeTagsOf } from '../src/extract.mjs'
+import { itemTraits } from '../src/ddragon.mjs'
+import { addProfiles, buildProfiles } from '../src/aggregate.mjs'
 import { addNext, buildNext, fedContexts, pooledNext } from '../src/nextItems.mjs'
 import { measurePriors, oppRows } from '../src/priors.mjs'
 import { tuningFeatures } from '../src/tuning.mjs'
@@ -192,4 +194,33 @@ test('objet suivant : 3e objet et adversaire très en avance', () => {
   assert.ok(c.nx['*']['5'][0] > 3000)
   const next = buildNext({ ...c, g: 8000 }, dd, measurePriors(state), pooledNext(state))
   assert.ok(next.ctx.fedAp.Shield[1] > 0.01, JSON.stringify(next.ctx.fedAp))
+})
+
+test('builds réels : objets critiques adverses et part magique habituelle des objets', () => {
+  assert.ok(itemTraits('', { FlatCritChanceMod: 0.25, FlatPhysicalDamageMod: 40 }).includes('crit'))
+  assert.ok(!itemTraits('', { FlatPhysicalDamageMod: 55 }).includes('crit'))
+  const items = new Map([
+    [10, { isLegendary: true, maps: new Set([11]), stats: { FlatCritChanceMod: 0.25, FlatPhysicalDamageMod: 40 }, traits: ['crit'] }],
+    [11, { isLegendary: true, maps: new Set([11]), stats: { FlatPhysicalDamageMod: 55 }, traits: ['armorPen'] }],
+    [12, { isLegendary: true, maps: new Set([11]), stats: { FlatMagicDamageMod: 90 }, traits: [] }]
+  ])
+  const dd2 = { items, champById: new Map([[21, 'MissFortune'], [22, 'Varus']]) }
+  // Deux tireurs critiques : 3 objets critiques au moins → '#crit'.
+  assert.ok(foeTagsOf([{ item0: 10, item1: 10 }, { item0: 10 }], dd2).includes('#crit'))
+  assert.ok(!foeTagsOf([{ item0: 10, item1: 11 }], dd2).includes('#crit'))
+  // Profils : part magique des objets (Miss Fortune létalité : 0 ; Varus AP : surtout magique).
+  const match = (champ, its) => ({
+    info: {
+      gameDuration: 1800,
+      participants: [{ championId: champ, ...Object.fromEntries(its.map((id, i) => [`item${i}`, id])) }]
+    }
+  })
+  const state = emptyState('16.22', 0)
+  for (let i = 0; i < 12; i++) {
+    addProfiles(state, extractProfiles(match(21, [11, 11]), dd2))
+    addProfiles(state, extractProfiles(match(22, [12, 12, 11]), dd2))
+  }
+  const profiles = buildProfiles(state, 10)
+  assert.equal(profiles.MissFortune.itemAp, 0)
+  assert.ok(profiles.Varus.itemAp > 0.6 && profiles.Varus.itemAp < 0.7, String(profiles.Varus.itemAp))
 })

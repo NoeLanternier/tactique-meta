@@ -164,7 +164,8 @@ export const FOE_TRAITS = [
   'magicPen',
   'armor',
   'mr',
-  'lifesteal'
+  'lifesteal',
+  'crit'
 ]
 /** Nombre d'objets adverses (fin de partie) à partir duquel la caractéristique compte. */
 export const FOE_TRAIT_MIN = {
@@ -176,7 +177,9 @@ export const FOE_TRAIT_MIN = {
   magicPen: 2,
   armor: 3,
   mr: 3,
-  lifesteal: 2
+  lifesteal: 2,
+  // Critiques : au moins 3 objets critiques chez l'adversaire (un vrai tireur critique).
+  crit: 3
 }
 
 /** Caractéristiques adverses d'une partie : '#antiheal', '#pctHp'… */
@@ -465,11 +468,21 @@ export function extractProfiles(match, dd) {
   return info.participants.map((p) => {
     let crit = 0
     let as = 0
+    // Part magique des statistiques offensives des objets (valeur en or approximative, comme
+    // l'app) : sert à repérer en partie un build qui s'écarte du build habituel du champion.
+    let apVal = 0
+    let adVal = 0
     for (let i = 0; i <= 6; i++) {
       const it = dd.items.get(p[`item${i}`])
       if (!it?.isLegendary) continue
       if (it.stats?.FlatCritChanceMod) crit++
       if (it.stats?.PercentAttackSpeedMod) as++
+      const s = it.stats ?? {}
+      apVal += (s.FlatMagicDamageMod ?? 0) * 20
+      adVal +=
+        (s.FlatPhysicalDamageMod ?? 0) * 35 +
+        (s.FlatCritChanceMod ?? 0) * 4000 +
+        (s.PercentAttackSpeedMod ?? 0) * 2500
     }
     const n = (f) => Number(p[f]) || 0
     return {
@@ -482,7 +495,8 @@ export function extractProfiles(match, dd) {
       tank: n('damageSelfMitigated') + n('totalDamageTaken'),
       cc: n('timeCCingOthers'),
       crit,
-      as
+      as,
+      itemAp: apVal + adVal > 0 ? apVal / (apVal + adVal) : null
     }
   })
 }

@@ -456,6 +456,11 @@ export function addProfiles(state, profiles) {
     s.g++
     for (const k of ['minutes', 'phys', 'magic', 'heal', 'shield', 'tank', 'cc', 'crit', 'as'])
       s[k] += p[k]
+    // Part magique des objets (parties où il a des objets offensifs).
+    if (typeof p.itemAp === 'number') {
+      s.itemAp = (s.itemAp ?? 0) + p.itemAp
+      s.itemN = (s.itemN ?? 0) + 1
+    }
   }
 }
 
@@ -755,7 +760,8 @@ function percentiles(entries) {
 /**
  * Profils mesurés de tous les champions : part de dégâts magiques, et rang centile (0 = le plus
  * faible, 1 = le plus fort de tous les champions) pour la résistance, les contrôles, les soins
- * et les boucliers alliés. crit / aa = nombre moyen d'objets critiques / de vitesse d'attaque.
+ * et les boucliers alliés. crit / aa = nombre moyen d'objets critiques / de vitesse d'attaque (÷ 2,
+ * plafonné à 1). itemAp = part magique habituelle des statistiques offensives de ses objets.
  */
 export function buildProfiles(state, minGames = 30) {
   const rows = Object.entries(state.profiles).filter(([, p]) => p.g >= minGames && p.minutes > 0)
@@ -773,6 +779,8 @@ export function buildProfiles(state, minGames = 30) {
       shield: round3(pct.shield[champ]),
       crit: round3(Math.min(1, p.crit / p.g / 2)),
       aa: round3(Math.min(1, p.as / p.g / 2)),
+      // Part magique habituelle des objets (l'app compare les objets réels en partie à celle-ci).
+      ...(p.itemN >= 10 ? { itemAp: round3(p.itemAp / p.itemN) } : {}),
       games: Math.round(p.g)
     }
   }
