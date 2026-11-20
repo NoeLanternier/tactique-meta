@@ -31,7 +31,19 @@ export const TUNING_KEYS = [
 ]
 const P = TUNING_KEYS.length + 1 // + constante
 
-const CONTEXT_KEYS = ['ap', 'ad', 'heal', 'tank', 'cc', 'allyAp', 'allyAd']
+const CONTEXT_KEYS = [
+  'ap',
+  'ad',
+  'heal',
+  'tank',
+  'cc',
+  'allyAp',
+  'allyAd',
+  'vsRanged',
+  'vsMelee',
+  'vsAp',
+  'vsAd'
+]
 /** Effet cumulé maximal des alliés et adversaires, en points de taux de victoire. */
 const PAIR_CAP = 0.06
 /**
@@ -197,7 +209,8 @@ export function tuningFeatures(meta, rec, contexts, dd) {
     pet: itemName(rec.pet),
     skills: rec.skills ?? null,
     start: startNames || null,
-    bootsT: rec.bootsT ?? null
+    bootsT: rec.bootsT ?? null,
+    spells: rec.spells ?? null
   }
   const lists = {
     runes: family?.runeChoices ?? build.choices?.runes,
@@ -205,7 +218,8 @@ export function tuningFeatures(meta, rec, contexts, dd) {
     pet: build.choices?.pet,
     skills: build.choices?.skills,
     start: build.choices?.start,
-    bootsT: build.choices?.bootsT
+    bootsT: build.choices?.bootsT,
+    spells: build.choices?.spells
   }
   const valueOf = {
     runes: (o) => JSON.stringify(o.runes),
@@ -213,7 +227,8 @@ export function tuningFeatures(meta, rec, contexts, dd) {
     pet: (o) => o.name,
     skills: (o) => o.value,
     start: (o) => (o.items ?? []).join(','),
-    bootsT: (o) => o.value
+    bootsT: (o) => o.value,
+    spells: (o) => (o.ids ?? []).join(',')
   }
   for (const kind of Object.keys(lists)) {
     const list = lists[kind]

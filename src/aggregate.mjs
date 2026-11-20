@@ -141,6 +141,7 @@ const CHAMP_MAPS = [
   'pet',
   'start',
   'bootsT',
+  'spells',
   'later',
   'skills',
   'vs',
@@ -180,10 +181,32 @@ function champState(state, champ) {
 }
 
 /**
- * Choix mesurés par contexte : page de runes, bottes, familier, ordre des compétences, départ et
- * moment des bottes (avant le 1er objet, entre le 1er et le 2e, après).
+ * Choix mesurés par contexte : page de runes, bottes, familier, ordre des compétences, départ,
+ * moment des bottes (avant le 1er objet, entre le 1er et le 2e, après) et sorts d'invocateur.
  */
-const CHOICE_KINDS = ['runes', 'boots', 'pet', 'skills', 'start', 'bootsT']
+const CHOICE_KINDS = ['runes', 'boots', 'pet', 'skills', 'start', 'bootsT', 'spells']
+
+/**
+ * Type d'adversaire direct (le jungler adverse pour un jungler, le joueur d'en face sinon) : à
+ * distance ou de mêlée (portée d'attaque), dégâts surtout magiques ou physiques (profil mesuré).
+ * Bien plus de parties par cellule qu'un adversaire précis : mesurable dès maintenant pour le
+ * départ, les bottes, les runes, la famille de build, le moment des bottes et les sorts.
+ */
+export const LANE_CONTEXTS = ['vsRanged', 'vsMelee', 'vsAp', 'vsAd']
+export function laneContexts(profiles, dd, opponent) {
+  if (!opponent) return []
+  const out = []
+  const range = dd?.champRange?.get(opponent)
+  if (typeof range === 'number' && range > 0) out.push(range >= 325 ? 'vsRanged' : 'vsMelee')
+  const p = profiles?.[opponent]
+  const dmg = p ? (p.phys ?? 0) + (p.magic ?? 0) : 0
+  if (p && (p.g ?? 0) >= 20 && dmg > 0) {
+    const ap = p.magic / dmg
+    if (ap >= 0.6) out.push('vsAp')
+    else if (ap <= 0.4) out.push('vsAd')
+  }
+  return out
+}
 /** Périodes des combats entre junglers (minutes). */
 export const DUEL_PERIODS = ['early', 'mid', 'late']
 const periodOf = (min) => (min < 6 ? 'early' : min < 14 ? 'mid' : 'late')
@@ -297,6 +320,7 @@ export function addRecord(state, rec) {
   inc(c.pet, rec.pet === null ? null : String(rec.pet), rec.win)
   inc(c.start, rec.start ?? null, rec.win)
   inc(c.bootsT, rec.bootsT ?? null, rec.win)
+  inc(c.spells, rec.spells ?? null, rec.win)
   inc(c.skills, rec.skills, rec.win)
   if (rec.enemyJungler) inc(c.vs, rec.enemyJungler, rec.win)
   for (const ally of rec.allies ?? []) inc(c.with, ally, rec.win)
@@ -353,10 +377,14 @@ export function addRecord(state, rec) {
     pet: rec.pet === null ? null : String(rec.pet),
     skills: rec.skills,
     start: rec.start ?? null,
-    bootsT: rec.bootsT ?? null
+    bootsT: rec.bootsT ?? null,
+    spells: rec.spells ?? null
   }
+  // Choix : selon la composition, et selon le type d'adversaire direct (rec.lane).
+  const lane = (rec.lane ?? []).filter((x) => LANE_CONTEXTS.includes(x))
+  for (const ctx of lane) inc(c.ctxBase, ctx, rec.win)
   for (const kind of CHOICE_KINDS)
-    for (const ctx of contexts) inc((c.opt[kind][ctx] ??= {}), choice[kind], rec.win)
+    for (const ctx of [...contexts, ...lane]) inc((c.opt[kind][ctx] ??= {}), choice[kind], rec.win)
   // Face à l'adversaire direct : départ, bottes, clé de voûte, famille (1er objet), moment des
   // bottes ; le familier selon le jungler adverse (petVs).
   const opp = rec.enemyJungler
@@ -367,7 +395,8 @@ export function addRecord(state, rec) {
       boots: choice.boots,
       keystone: rec.runeSig ? keystoneOf(rec.runeSig) : null,
       fam: rec.core.length >= 1 ? String(rec.core[0]) : null,
-      bootsT: choice.bootsT
+      bootsT: choice.bootsT,
+      spells: choice.spells
     }
     for (const [kind, value] of Object.entries(vsValues))
       if (value) inc(((c.optVs[kind] ??= {})[opp] ??= {}), value, rec.win)
@@ -415,7 +444,7 @@ export function addRecord(state, rec) {
     inc(f.boots, rec.boots === null ? null : String(rec.boots), rec.win)
     inc(f.pet, rec.pet === null ? null : String(rec.pet), rec.win)
     inc(f.skills, rec.skills, rec.win)
-    for (const ctx of contexts) {
+    for (const ctx of [...contexts, ...lane]) {
       inc(f.ctxBase, ctx, rec.win)
       inc((f.ctxRunes[ctx] ??= {}), rec.runeSig, rec.win)
     }
@@ -1030,6 +1059,17 @@ export function buildChoices(c, dd, priors = DEFAULT_PRIORS) {
     max: 3
   })
   if (bootsT.length >= 2) out.bootsT = bootsT
+  // Sorts d'invocateur : selon la partie et l'adversaire direct.
+  const spells = choiceList(
+    c.spells,
+    c.opt?.spells,
+    (v) => {
+      const ids = String(v).split(',').map(Number)
+      return ids.length === 2 && ids.every((x) => x > 0) ? { ids } : null
+    },
+    { opp: (v) => opp('spells', v), max: 3 }
+  )
+  if (spells.length >= 2) out.spells = spells
   return out
 }
 

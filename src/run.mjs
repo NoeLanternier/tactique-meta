@@ -42,11 +42,12 @@ import {
   classifyContexts,
   emptyState,
   expectedEnemy,
+  laneContexts,
   seedFromPrevious,
   upgradeState
 } from './aggregate.mjs'
 import { evaluateRecord } from './backtest.mjs'
-import { fedContexts } from './nextItems.mjs'
+import { fedContexts, purchaseContexts } from './nextItems.mjs'
 import { poolEvidence } from './priors.mjs'
 import { addTuning, tuningFeatures } from './tuning.mjs'
 import { emptyQuality, qualityIssues, recordQuality } from './quality.mjs'
@@ -380,12 +381,13 @@ async function main() {
         rec.enemy = expectedEnemy(profiles, rec.enemies ?? [])
         rec.ally = expectedEnemy(profiles, rec.allies ?? [])
         rec.itemFedCtx = fedContexts(profiles, rec.itemFed)
+        rec.itemComp = purchaseContexts(profiles, rec.itemFoes)
         if (
           run.previous?.patch === dd.patch &&
           run.previous?.contexts === CONTEXT_KIND &&
           run.previous?.priors
         ) {
-          const contexts = classifyContexts(run.state, rec.enemy, rec.ally)
+          const contexts = [...classifyContexts(run.state, rec.enemy, rec.ally), ...(rec.lane ?? [])]
           evaluateRecord(run.previous, contexts, rec, run.state.backtest, dd)
           if (run.previous.priors.against)
             addTuning(run.state.tuning, tuningFeatures(run.previous, rec, contexts, dd), rec.win)
@@ -442,6 +444,9 @@ async function main() {
           // Sa propre équipe (4 alliés), et adversaire très en avance à chaque achat d'objet.
           rec.ally = expectedEnemy(main.profiles, rec.allies ?? [])
           rec.itemFedCtx = fedContexts(main.profiles, rec.itemFed)
+          rec.itemComp = purchaseContexts(main.profiles, rec.itemFoes)
+          // Type d'adversaire direct (distance ou mêlée, dégâts magiques ou physiques).
+          rec.lane = laneContexts(main.profiles, dd, rec.enemyJungler)
           // Contrôle des données : les supports achètent leur premier objet plus tard, on ne
           // les compte pas (les seuils sont faits pour les autres postes).
           if (rec.role !== 'support') recordQuality(quality, rec)
@@ -452,7 +457,10 @@ async function main() {
             slot.previous?.contexts === CONTEXT_KIND &&
             slot.previous?.priors
           ) {
-            const contexts = classifyContexts(slot.state, rec.enemy, rec.ally)
+            const contexts = [
+              ...classifyContexts(slot.state, rec.enemy, rec.ally),
+              ...(rec.lane ?? [])
+            ]
             evaluateRecord(slot.previous, contexts, rec, slot.state.backtest, dd)
             // (réglage : seulement avec une méta dont l'affrontement et les paires sont mesurés en
             // écart propre au champion, comme le calcule l'app.)

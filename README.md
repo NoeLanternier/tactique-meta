@@ -171,7 +171,9 @@ partie (par exemple face à un adversaire très en avance).
   presque tout le monde a déjà ne dit rien de plus. Un objet presque jamais pris après un objet
   possédé (moins de 5 achats sur au moins 300) est écarté.
 - **Selon la partie.** Mêmes interactions avec la composition adverse (dégâts magiques ou
-  physiques, soins, résistance, contrôles) et alliée (voir « Équipe alliée »), avec l'avance ou le
+  physiques et équipe critique **au moment de l'achat**, d'après les objets que les adversaires ont
+  déjà achetés à cette minute, comme l'app les voit en partie ; soins, résistance, contrôles) et
+  alliée (voir « Équipe alliée »), avec l'avance ou le
   retard au moment de l'achat, et avec un **adversaire très en avance** à ce moment (au moins 30 %
   d'or de plus que la moyenne de son équipe et 1 500 pièces d'or de plus), selon ses dégâts
   (`fedAp` : surtout magiques, `fedAd` : surtout physiques). L'app impose toujours un objet
@@ -220,6 +222,15 @@ de 0,3 point. Le backtest de la famille et le réglage du moteur en tiennent com
 qui joue AP ou AD, comme Kai'Sa ou Varus), runes et autres choix, objets, objet suivant. L'app
 n'utilise plus sa règle manuelle des dégâts qui manquent à l'équipe dès que la méta mesure ces
 contextes.
+
+**Type d'adversaire direct** : à distance ou de mêlée (portée d'attaque Data Dragon), dégâts surtout
+magiques ou physiques (profil mesuré) : contextes `vsRanged`, `vsMelee`, `vsAp`, `vsAd` pour le départ,
+les bottes, les runes, la famille de build, le moment des bottes et les sorts. Bien plus de parties
+par cellule qu'un adversaire précis : mesurable dès maintenant, sans attendre la clé de production.
+
+**Sorts d'invocateur** (`builds[].choices.spells`) : paires de sorts mesurées selon la composition, le
+type d'adversaire direct et l'adversaire précis ; l'app conseille la paire la plus jouée sauf si une
+autre gagne nettement plus dans la partie.
 
 **Moment des bottes** (`builds[].choices.bootsT`) : avant le 1er objet légendaire (`early`), entre le
 1er et le 2e (`first`) ou après (`later`), selon la composition et l'adversaire direct. L'app place

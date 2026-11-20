@@ -30,6 +30,7 @@ export const NEXT_RANKS = [2, 3, 4, 5]
 export const NEXT_CONTEXTS = [
   'ap',
   'ad',
+  'crit',
   'heal',
   'tank',
   'cc',
@@ -40,6 +41,58 @@ export const NEXT_CONTEXTS = [
   'fedAp',
   'fedAd'
 ]
+
+/** Passifs qui multiplient les chances de critique (comme l'app). */
+const CRIT_KIT = { Yasuo: 2, Yone: 2 }
+
+/**
+ * Composition adverse au moment de chaque achat (rec.itemFoes, voir extract.mjs foesAt), calculée
+ * comme l'app en partie : les objets de chaque adversaire remplacent peu à peu son profil habituel
+ * (critiques : seuls ses objets comptent vers 7 000 pièces d'or dépensées ; dégâts magiques ou
+ * physiques : écart de ses objets à ceux qu'il construit d'habitude). Renvoie, pour chaque achat,
+ * les contextes 'ap' / 'ad' (part magique des dégâts adverses, mêmes seuils que la composition
+ * attendue) et 'crit' (au moins l'équivalent de 1,2 adversaire entièrement critique), ou null.
+ */
+export function purchaseContexts(profiles, itemFoes) {
+  const clamp01 = (x) => Math.max(0, Math.min(1, x))
+  return (itemFoes ?? []).map((foes) => {
+    if (!Array.isArray(foes) || !foes.length) return null
+    let magic = 0
+    let phys = 0
+    let crit = 0
+    let known = 0
+    for (const [champ, spent, apVal, adVal, critChance] of foes) {
+      const p = profiles?.[champ]
+      if (!p || (p.g ?? 0) < 20 || !(p.minutes > 0)) continue
+      known++
+      const dmg = (p.phys ?? 0) + (p.magic ?? 0)
+      const baseAp = dmg > 0 ? p.magic / dmg : 0.5
+      const baseItemAp = (p.itemN ?? 0) >= 10 ? p.itemAp / p.itemN : null
+      const dmgKnown = clamp01((apVal + adVal) / 6000)
+      let apShare = baseAp
+      if (apVal + adVal > 0) {
+        const itemAp = apVal / (apVal + adVal)
+        apShare =
+          baseItemAp !== null
+            ? clamp01(baseAp + 0.8 * dmgKnown * (itemAp - baseItemAp))
+            : (1 - 0.75 * dmgKnown) * baseAp + 0.75 * dmgKnown * itemAp
+      }
+      const perMin = dmg / p.minutes
+      magic += perMin * apShare
+      phys += perMin * (1 - apShare)
+      const k = clamp01(spent / 7000)
+      const baseCrit = Math.min(1, (p.crit ?? 0) / p.g / 2)
+      crit += (1 - k) * baseCrit + k * clamp01((critChance * (CRIT_KIT[champ] ?? 1)) / 0.5)
+    }
+    if (known < 3 || !(magic + phys > 0)) return null
+    const share = magic / (magic + phys)
+    const out = []
+    if (share >= 0.55) out.push('ap')
+    else if (share <= 0.35) out.push('ad')
+    if (crit / 2 >= 0.6) out.push('crit')
+    return out
+  })
+}
 
 /**
  * Contexte « adversaire très en avance » de chaque achat (rec.itemFed : son champion) : 'fedAp' si
@@ -78,6 +131,18 @@ const expected = (cell) => ((cell?.[1] ?? 0) + 10) / ((cell?.[0] ?? 0) + 20)
 
 const STATE_CTX = { a: 'ahead', b: 'behind' }
 
+/**
+ * Contextes de composition d'un achat : ceux de la partie, sauf dégâts magiques / physiques et
+ * critiques, pris dans la composition adverse au moment de l'achat quand elle est connue
+ * (rec.itemComp, voir purchaseContexts).
+ */
+function contextsAt(contexts, rec, k) {
+  const now = rec.itemComp?.[k]
+  const base = contexts.filter((x) => x !== 'all' && NEXT_CONTEXTS.includes(x))
+  if (!Array.isArray(now)) return base
+  return [...base.filter((x) => x !== 'ap' && x !== 'ad' && x !== 'crit'), ...now]
+}
+
 function addCell(map, key, win, e) {
   const cell = (map[key] ??= [0, 0, 0])
   cell[0] += 1
@@ -112,7 +177,7 @@ export function addNext(state, c, rec, contexts) {
     const id = String(items[k])
     addCell(nx['*'], id, rec.win, e)
     for (const owned of items.slice(0, k)) addCell((nx.a[owned] ??= {}), id, rec.win, e)
-    const ctx = contexts.filter((x) => x !== 'all' && NEXT_CONTEXTS.includes(x))
+    const ctx = contextsAt(contexts, rec, k)
     const st = STATE_CTX[rec.itemState?.[k]]
     if (st) ctx.push(st)
     const fed = rec.itemFedCtx?.[k]
@@ -359,7 +424,6 @@ export function evaluateNext(meta, contexts, rec, bt, dd, oldRecommend) {
   const curve = meta?.lead?.p
   if (!next || !curve) return false
   const names = (rec.items ?? []).map((id) => dd.items.get(Number(id))?.name ?? null)
-  const comp = contexts.filter((x) => x !== 'all' && NEXT_CONTEXTS.includes(x)).map((x) => [x, 1])
   let counted = false
   for (const k of NEXT_RANKS) {
     const actual = names[k]
@@ -369,6 +433,7 @@ export function evaluateNext(meta, contexts, rec, bt, dd, oldRecommend) {
     const owned = names.slice(0, k).filter(Boolean)
     const st = STATE_CTX[rec.itemState?.[k]]
     const fed = rec.itemFedCtx?.[k]
+    const comp = contextsAt(contexts, rec, k).map((x) => [x, 1])
     const ctx = [...comp, ...(st ? [[st, 1]] : []), ...(fed ? [[fed, 1]] : [])]
     const ranked = rankNext(next, owned, ctx, { gamma: 0, slope: 1 })
     const mine = ranked.find((x) => x.item === actual)

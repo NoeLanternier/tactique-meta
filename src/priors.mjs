@@ -28,7 +28,9 @@ export const stateOfLead = (lead) =>
         : 'e'
 // (allyAp / allyAd : composition de sa propre équipe, voir aggregate.mjs.)
 const COMP_CONTEXTS = ['ap', 'ad', 'heal', 'tank', 'cc', 'allyAp', 'allyAd']
-const CHOICE_KINDS = ['runes', 'boots', 'pet', 'skills', 'start', 'bootsT']
+// Type d'adversaire direct (voir aggregate.mjs laneContexts) : pour les choix et les familles.
+const LANE_CONTEXTS = ['vsRanged', 'vsMelee', 'vsAp', 'vsAd']
+const CHOICE_KINDS = ['runes', 'boots', 'pet', 'skills', 'start', 'bootsT', 'spells']
 
 /** Valeurs utilisées tant qu'une famille n'a pas assez de données pour être mesurée. */
 export const DEFAULT_PRIORS = {
@@ -55,6 +57,8 @@ export const DEFAULT_PRIORS = {
   choiceVs: 5000,
   // Moment des bottes (avant le 1er objet, entre le 1er et le 2e, après).
   bootsT: 3000,
+  // Sorts d'invocateur (paire).
+  spells: 3000,
   // Objet suivant (voir nextItems.mjs) : écart propre au champion, après un objet, par contexte.
   nx0: 3000,
   nxJ: 5000,
@@ -129,7 +133,7 @@ function choiceTotals(c, kind) {
 }
 
 /** Choix mesurés face à l'adversaire direct (familier : compteurs petVs, déjà tenus). */
-export const OPP_KINDS = ['start', 'boots', 'keystone', 'fam', 'pet', 'bootsT']
+export const OPP_KINDS = ['start', 'boots', 'keystone', 'fam', 'pet', 'bootsT', 'spells']
 
 /**
  * Choix d'un champion face à chaque adversaire direct (le jungler adverse pour un jungler, le
@@ -189,6 +193,7 @@ const FAMILIES = [
   'choiceCtx',
   'choiceVs',
   'bootsT',
+  'spells',
   'nx0',
   'nxJ',
   'nxC'
@@ -221,15 +226,17 @@ function priorCells(state) {
 
     // Écart du champion dans chaque contexte (sert aussi aux familles et aux choix).
     const ctxShift = {}
-    for (const ctx of COMP_CONTEXTS) {
+    for (const ctx of [...COMP_CONTEXTS, ...LANE_CONTEXTS]) {
       const cell = c.ctxBase?.[ctx]
       if (!cell || cell[0] < 30) continue
       const [g] = cell
       ctxShift[ctx] = { shift: rate(cell) - b, v: binVar(b, g) * (1 - g / c.g) }
-      cells.comp.push([g, rate(cell) - b - ctxMean[ctx], ctxShift[ctx].v])
+      // (type d'adversaire direct : déjà dans les affrontements, pas dans la composition.)
+      if (COMP_CONTEXTS.includes(ctx))
+        cells.comp.push([g, rate(cell) - b - ctxMean[ctx], ctxShift[ctx].v])
     }
 
-    for (const kind of ['runes', 'boots', 'skills', 'start', 'pet', 'c1', 'bootsT'])
+    for (const kind of ['runes', 'boots', 'skills', 'start', 'pet', 'c1', 'bootsT', 'spells'])
       cells[kind].push(...partitionCells(c[kind]))
     const keystones = {}
     for (const [sig, [g, w]] of Object.entries(c.runes ?? {})) {

@@ -11,10 +11,10 @@ import {
   oppEffects
 } from '../src/aggregate.mjs'
 import { recommendedVariant } from '../src/backtest.mjs'
-import { bootsTiming, extractProfiles, fedAt, foeTagsOf } from '../src/extract.mjs'
+import { bootsTiming, extractProfiles, fedAt, foeTagsOf, foesAt } from '../src/extract.mjs'
 import { itemTraits } from '../src/ddragon.mjs'
-import { addProfiles, buildProfiles } from '../src/aggregate.mjs'
-import { addNext, buildNext, fedContexts, pooledNext } from '../src/nextItems.mjs'
+import { addProfiles, buildProfiles, laneContexts } from '../src/aggregate.mjs'
+import { addNext, buildNext, fedContexts, pooledNext, purchaseContexts } from '../src/nextItems.mjs'
 import { measurePriors, oppRows } from '../src/priors.mjs'
 import { tuningFeatures } from '../src/tuning.mjs'
 
@@ -223,4 +223,74 @@ test('builds réels : objets critiques adverses et part magique habituelle des o
   const profiles = buildProfiles(state, 10)
   assert.equal(profiles.MissFortune.itemAp, 0)
   assert.ok(profiles.Varus.itemAp > 0.6 && profiles.Varus.itemAp < 0.7, String(profiles.Varus.itemAp))
+})
+
+test('composition adverse au moment de chaque achat, d’après les vrais objets', () => {
+  const items = new Map([
+    [10, { stats: { FlatCritChanceMod: 0.25, FlatPhysicalDamageMod: 40 } }],
+    [11, { stats: { FlatPhysicalDamageMod: 55 } }],
+    [12, { stats: { FlatMagicDamageMod: 90 } }]
+  ])
+  const timeline = {
+    info: {
+      frames: Array.from({ length: 30 }, (_, m) => ({
+        participantFrames: { 6: { totalGold: 500 + m * 400, currentGold: 300 }, 7: { totalGold: 500 + m * 380, currentGold: 200 } }
+      }))
+    }
+  }
+  const foes = [{ participantId: 6 }, { participantId: 7 }]
+  const bought = new Map([
+    [6, [{ id: 11, min: 9 }, { id: 11, min: 15 }]],
+    [7, [{ id: 12, min: 10 }, { id: 12, min: 20 }]]
+  ])
+  const champ = (f) => (f.participantId === 6 ? 'MissFortune' : 'Varus')
+  const at14 = foesAt(timeline, foes, bought, 14, { items }, champ)
+  // Miss Fortune à 14 min : un objet AD (le second est acheté à 15 min), or dépensé d'après la chronologie.
+  assert.deepEqual(at14[0], ['MissFortune', 500 + 14 * 400 - 300, 0, 55 * 35, 0])
+  assert.equal(at14[1][2], 1800) // un objet AP à 14 min
+  // Profils : Miss Fortune critique et physique d'habitude ; Varus physique d'habitude.
+  const p = (phys, magic, crit, itemAp) => ({ g: 100, minutes: 3000, phys, magic, crit, itemAp: itemAp * 50, itemN: 50 })
+  const profiles = {
+    MissFortune: p(90000, 5000, 200, 0),
+    Varus: p(80000, 20000, 60, 0.1),
+    Garen: p(70000, 5000, 0, 0),
+    Leona: p(20000, 30000, 0, 0.5),
+    Lux: p(5000, 90000, 0, 1)
+  }
+  // Varus AP (deux objets AP) + Miss Fortune létalité (aucun critique) : équipe AP, pas critique.
+  const late = [['MissFortune', 9000, 0, 3850, 0], ['Varus', 8000, 3600, 0, 0], ['Garen', 6000, 0, 1000, 0], ['Leona', 5000, 0, 0, 0], ['Lux', 7000, 3600, 0, 0]]
+  // Au début (aucun objet) : profils habituels, Miss Fortune et Varus physiques → équipe AD, critique.
+  const early = late.map(([c]) => [c, 500, 0, 0, 0])
+  const [now, before] = purchaseContexts(profiles, [late, early])
+  assert.ok(!now.includes('crit'), JSON.stringify(now))
+  assert.ok(now.includes('ap') || !now.includes('ad'), JSON.stringify(now))
+  assert.ok(!before.includes('ap'), JSON.stringify(before))
+  // Miss Fortune et un second tireur critiques : 'crit'.
+  const crits = [['MissFortune', 9000, 0, 5000, 0.75], ['Varus', 9000, 0, 5000, 0.5], ['Garen', 6000, 0, 1000, 0], ['Leona', 5000, 0, 0, 0], ['Lux', 7000, 3600, 0, 0]]
+  assert.ok(purchaseContexts(profiles, [crits])[0].includes('crit'))
+  // Moins de 3 adversaires connus : rien.
+  assert.equal(purchaseContexts({}, [late])[0], null)
+})
+
+test('adversaire de voie par type (distance, dégâts) et sorts d’invocateur', () => {
+  const dd3 = { ...dd, champRange: new Map([['Teemo', 500], ['Darius', 175]]) }
+  const profiles = { Teemo: { g: 50, phys: 20, magic: 80 }, Darius: { g: 50, phys: 90, magic: 10 } }
+  assert.deepEqual(laneContexts(profiles, dd3, 'Teemo'), ['vsRanged', 'vsAp'])
+  assert.deepEqual(laneContexts(profiles, dd3, 'Darius'), ['vsMelee', 'vsAd'])
+  assert.deepEqual(laneContexts(profiles, dd3, null), [])
+  // Garen : Fantôme + Saut éclair gagne contre les adversaires de mêlée, Embrasement à distance.
+  const state = emptyState('16.22', 0)
+  for (let i = 0; i < 6000; i++) {
+    const ranged = random() < 0.5
+    const ghost = random() < 0.5
+    const good = ranged ? !ghost : ghost
+    addRecord(state, rec({ win: random() < (good ? 0.56 : 0.46), spells: ghost ? '4,6' : '4,14', lane: ranged ? ['vsRanged'] : ['vsMelee'] }))
+  }
+  const choices = buildChoices(state.champs.Garen, dd, measurePriors(state))
+  const ghost = choices.spells.find((o) => o.ids.join() === '4,6')
+  const ignite = choices.spells.find((o) => o.ids.join() === '4,14')
+  assert.ok(ghost.contexts.vsMelee[1] > ghost.contexts.vsRanged[1] + 0.05)
+  assert.ok(ignite.contexts.vsRanged[1] > ignite.contexts.vsMelee[1] + 0.05)
+  // Le type d'adversaire ne fausse pas les objets par contexte (composition seulement).
+  assert.equal(state.champs.Garen.ctxItems.vsMelee, undefined)
 })

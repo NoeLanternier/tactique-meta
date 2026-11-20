@@ -135,6 +135,36 @@ export function fedAt(timeline, teamOf, team, minute) {
 }
 
 /**
+ * État des adversaires à une minute donnée, d'après la chronologie : pour chacun, [champion, or
+ * dépensé, valeur des statistiques magiques, valeur des statistiques physiques (dégâts, critiques,
+ * vitesse d'attaque), chances de critique] de ses objets légendaires et bottes achetés jusque-là
+ * (mêmes valeurs en or que l'app). Sert à mesurer chaque achat dans la partie telle qu'elle était à
+ * ce moment (une Miss Fortune létalité n'est pas une équipe critique), comme l'app la voit en partie.
+ */
+export function foesAt(timeline, foes, bought, minute, dd, champOf) {
+  const frames = timeline?.info?.frames ?? []
+  const frame = frames[Math.max(0, Math.min(frames.length - 1, Math.floor(minute)))]
+  return foes.map((f) => {
+    const pf = frame?.participantFrames?.[String(f.participantId)]
+    const spent = pf ? Math.max(0, (Number(pf.totalGold) || 0) - (Number(pf.currentGold) || 0)) : 0
+    let ap = 0
+    let ad = 0
+    let crit = 0
+    for (const b of bought.get(f.participantId) ?? []) {
+      if (b.min > minute) break
+      const s = dd.items.get(b.id)?.stats ?? {}
+      ap += (s.FlatMagicDamageMod ?? 0) * 20
+      ad +=
+        (s.FlatPhysicalDamageMod ?? 0) * 35 +
+        (s.FlatCritChanceMod ?? 0) * 4000 +
+        (s.PercentAttackSpeedMod ?? 0) * 2500
+      crit += s.FlatCritChanceMod ?? 0
+    }
+    return [champOf(f), Math.round(spent), Math.round(ap), Math.round(ad), Math.round(crit * 100) / 100]
+  })
+}
+
+/**
  * Moment des bottes (bottes de niveau 2) par rapport aux objets légendaires : 'early' avant le 1er,
  * 'first' entre le 1er et le 2e, 'later' après le 2e (ou jamais, avec au moins deux objets). Null
  * si la partie est trop courte pour le savoir.
@@ -343,6 +373,16 @@ export function extractPlayers(match, timeline, dd, roles = ROLES, mode = null) 
   // Carte de la partie : les objets finaux dépendent de la carte (Abîme hurlant…).
   const mapId = mode ? Number(info.mapId) || MODES[mode]?.map || 0 : 11
   const isFinal = (id) => legendaryOn(dd.items.get(id), mapId)
+  // Objets légendaires et bottes achetés par chaque joueur, dans l'ordre (état des adversaires à
+  // chaque achat, voir foesAt).
+  const bigBuys = new Map()
+  for (const x of info.participants) {
+    const list = purchases(events.get(x.participantId) ?? []).filter((b) => {
+      const it = dd.items.get(b.id)
+      return !it?.evolvesFrom && (isFinal(b.id) || it?.isBoots)
+    })
+    bigBuys.set(x.participantId, list)
+  }
   const records = []
   const wanted = (x) => !!mode || roles.includes(ROLE_OF_POSITION[x.teamPosition])
   for (const p of info.participants.filter(wanted)) {
@@ -415,6 +455,8 @@ export function extractPlayers(match, timeline, dd, roles = ROLES, mode = null) 
         const lead = leadAt(timeline, teamOf, p.teamId, min)
         return lead === null ? null : Math.round(lead * 1000) / 1000
       }),
+      // Adversaires à chaque achat (objets et or dépensé), pour les contextes au moment de l'achat.
+      itemFoes: legendaryMin.slice(0, 6).map((min) => foesAt(timeline, foes, bigBuys, min, dd, champOf)),
       // Adversaire très en avance à chaque achat (champion), pour les objets de protection.
       itemFed: legendaryMin.slice(0, 6).map((min) => {
         const pid = fedAt(timeline, teamOf, p.teamId, min)
@@ -425,6 +467,11 @@ export function extractPlayers(match, timeline, dd, roles = ROLES, mode = null) 
       bootsT: bootsTiming(bootsBuy?.min, legendaryMin),
       pet,
       start: start.length ? start.join(',') : null,
+      // Sorts d'invocateur (paire triée, ex. « 4,14 » : Saut éclair + Embrasement).
+      spells:
+        Number(p.summoner1Id) > 0 && Number(p.summoner2Id) > 0
+          ? [Number(p.summoner1Id), Number(p.summoner2Id)].sort((a, b) => a - b).join(',')
+          : null,
       skills: skillOrder(events.get(p.participantId) ?? []),
       enemyJungler: enemyJungler ? champOf(enemyJungler) : null,
       allies,

@@ -45,7 +45,12 @@ export function buildDdragon(version, championJson, itemJson, runesJson) {
   const patch = version.split('.').slice(0, 2).join('.')
 
   const champById = new Map()
-  for (const c of Object.values(championJson.data)) champById.set(Number(c.key), c.id)
+  // Portée d'attaque de chaque champion (adversaire à distance ou de mêlée).
+  const champRange = new Map()
+  for (const c of Object.values(championJson.data)) {
+    champById.set(Number(c.key), c.id)
+    champRange.set(c.id, Number(c.stats?.attackrange) || 0)
+  }
 
   const items = new Map()
   for (const [idStr, it] of Object.entries(itemJson.data)) {
@@ -107,7 +112,17 @@ export function buildDdragon(version, championJson, itemJson, runesJson) {
     })
   }
 
-  return { version, patch, champById, items, runes, trees, augments: new Map(), augmentModes: {} }
+  return {
+    version,
+    patch,
+    champById,
+    champRange,
+    items,
+    runes,
+    trees,
+    augments: new Map(),
+    augmentModes: {}
+  }
 }
 
 /** Objet final disponible sur cette carte (0 : carte inconnue, toutes cartes). */
