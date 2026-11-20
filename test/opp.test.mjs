@@ -294,3 +294,35 @@ test('adversaire de voie par type (distance, dégâts) et sorts d’invocateur',
   // Le type d'adversaire ne fausse pas les objets par contexte (composition seulement).
   assert.equal(state.champs.Garen.ctxItems.vsMelee, undefined)
 })
+
+test('objets face aux objets adverses présents au moment de l’achat', async () => {
+  const { buildItemCounters } = await import('../src/aggregate.mjs')
+  const { tagsAt } = await import('../src/extract.mjs')
+  // Objets adverses du moment : seuls ceux achetés avant la minute comptent.
+  const items = new Map([[30, { isLegendary: true, traits: ['antiheal'] }]])
+  const bought = new Map([[6, [{ id: 30, min: 12 }]]])
+  const isFinal = (id) => !!items.get(id)?.isLegendary
+  assert.deepEqual(tagsAt([{ participantId: 6 }], bought, 10, { items }, isFinal), [])
+  assert.deepEqual(tagsAt([{ participantId: 6 }], bought, 14, { items }, isFinal), ['#antiheal'])
+  // « Pen » gagne nettement plus quand l'adversaire a déjà de l'armure au moment de l'achat ; en fin
+  // de partie, tout le monde finit par en avoir (la mesure de fin de partie ne le verrait pas).
+  const state = emptyState('16.22', 0)
+  for (let i = 0; i < 9000; i++) {
+    const armorNow = random() < 0.5
+    const pen = random() < 0.5
+    // (effet fort : la mesure d'un objet face à un type d'objet adverse est fortement lissée.)
+    const p = 0.5 + (pen ? (armorNow ? 0.25 : -0.15) : 0)
+    addRecord(state, rec({
+      champ: ['Garen', 'Darius', 'Fiora'][i % 3],
+      win: random() < p,
+      core: [1, 2, pen ? 7 : 6],
+      items: [1, 2, pen ? 7 : 6],
+      itemLead: [0, 0, 0],
+      itemTags: [[], [], armorNow ? ['#armor'] : []],
+      foeTags: ['#armor']
+    }))
+  }
+  assert.ok(state.nowAll[0] >= 20000)
+  const counters = buildItemCounters(state, dd, { minItemGames: 100, minPairGames: 40 })
+  assert.ok(counters.Pen?.['#armor']?.[1] > 0.004, JSON.stringify(counters.Pen))
+})

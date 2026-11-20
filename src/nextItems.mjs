@@ -159,6 +159,9 @@ function addCell(map, key, win, e) {
 export function addNext(state, c, rec, contexts) {
   const items = rec.items ?? []
   const leads = rec.itemLead ?? []
+  // Victoire attendue à chaque achat (null sans écart d'or connu), renvoyée pour les autres mesures
+  // faites à avance égale (objets face aux objets adverses, voir aggregate.mjs).
+  const expect = items.map(() => null)
   const nx = (c.nx ??= {})
   nx['*'] ??= {}
   nx.a ??= {}
@@ -171,6 +174,7 @@ export function addNext(state, c, rec, contexts) {
     const bucket = leadBucket(lead)
     const cell = (curve[bucket] ??= [0, 0])
     const e = expected(cell)
+    expect[k] = e
     cell[0] += 1
     if (rec.win) cell[1] += 1
     if (!NEXT_RANKS.includes(k)) continue
@@ -184,6 +188,7 @@ export function addNext(state, c, rec, contexts) {
     if (fed) ctx.push(fed)
     for (const x of ctx) addCell((nx.x[x] ??= {}), id, rec.win, e)
   }
+  return expect
 }
 
 /** Courbe publiée : victoire attendue par rang (3 à 5) et tranche d'écart d'or. */

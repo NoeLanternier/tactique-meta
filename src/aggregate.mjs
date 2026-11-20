@@ -150,6 +150,11 @@ const CHAMP_MAPS = [
   'ctxBase'
 ]
 
+function addExcess(cell, x) {
+  cell[0] += 1
+  cell[1] = Math.round((cell[1] + x) * 10000) / 10000
+}
+
 function inc(map, key, win, weight = 1) {
   if (key === null || key === undefined || key === '') return
   const cell = (map[key] ??= [0, 0])
@@ -362,7 +367,20 @@ export function addRecord(state, rec) {
     for (const id of items) inc(present, String(id), rec.win)
   }
   // 4e au 6e objet : chaque achat comparé aux autres décisions prises au même moment.
-  addNext(state, c, rec, contexts)
+  const expect = addNext(state, c, rec, contexts)
+  // Objets face aux objets adverses présents au moment de l'achat, à avance égale : victoires en
+  // plus de l'attente (écart d'or à cet achat), [achats, somme des victoires en plus].
+  items.forEach((id, k) => {
+    const e = expect?.[k]
+    if (typeof e !== 'number') return
+    const x = (rec.win ? 1 : 0) - e
+    addExcess((state.nowAll ??= [0, 0]), x)
+    addExcess(((state.itemNow ??= {})[id] ??= [0, 0]), x)
+    for (const t of rec.itemTags?.[k] ?? []) {
+      addExcess(((state.traitNow ??= {})[t] ??= [0, 0]), x)
+      addExcess((((state.itemTrait ??= {})[id] ??= {})[t] ??= [0, 0]), x)
+    }
+  })
   // Objet au k-ième rang, selon l'état de la partie à l'achat : comparé ensuite aux autres objets
   // achetés au même rang et dans le même état.
   items.forEach((id, k) => {
@@ -510,6 +528,11 @@ export function seedFromPrevious(state, previous, factor = 0.25) {
   state.itemAll = scaleDeep(previous.itemAll ?? {}, factor)
   state.itemFoe = scaleDeep(previous.itemFoe ?? {}, factor)
   state.foeAll = scaleDeep(previous.foeAll ?? {}, factor)
+  // Objets face aux objets adverses au moment de l'achat (victoires en plus).
+  state.nowAll = scaleDeep(previous.nowAll ?? [0, 0], factor)
+  state.itemNow = scaleDeep(previous.itemNow ?? {}, factor)
+  state.traitNow = scaleDeep(previous.traitNow ?? {}, factor)
+  state.itemTrait = scaleDeep(previous.itemTrait ?? {}, factor)
   state.ctxStats = previous.ctxStats ?? {}
   // Courbe de victoire selon l'avance à chaque achat (rapprochée de 50 % par le petit nombre).
   state.lead = scaleDeep(previous.lead ?? {}, factor)
@@ -1129,6 +1152,9 @@ export function buildVariants(champ, c, dd, { minGames = 40, priors, allowNoRune
  * les données permettent de mesurer (voir stats.mjs) et publiés tels quels : l'app les additionne
  * sans autre correction. Seuls les écarts d'au moins 0,4 point sont gardés.
  */
+/** Achats (avec écart d'or connu) à partir desquels les objets adverses du moment remplacent ceux de fin de partie. */
+const MIN_NOW_PURCHASES = 20000
+
 export function buildItemCounters(state, dd, { minItemGames = 200, minPairGames = 40 } = {}) {
   let G = 0
   let W = 0
@@ -1149,6 +1175,25 @@ export function buildItemCounters(state, dd, { minItemGames = 200, minPairGames 
       if (!fa || fa[0] < 200) continue
       const dev = pw / pg - base - (fa[1] / fa[0] - overall)
       rows.push({ item: it.name, foe, n: pg, dev, v: (base * (1 - base)) / pg })
+    }
+  }
+  // Objets adverses : mesurés au moment de l'achat (ce que l'app voit en partie), à avance égale,
+  // dès qu'il y a assez d'achats ; sinon, ancienne mesure avec les objets de fin de partie.
+  const nowAll = state.nowAll
+  const useNow = Array.isArray(nowAll) && nowAll[0] >= MIN_NOW_PURCHASES
+  if (useNow) {
+    for (let i = rows.length - 1; i >= 0; i--) if (rows[i].foe.startsWith('#')) rows.splice(i, 1)
+    const all = nowAll[1] / nowAll[0]
+    for (const [id, byTrait] of Object.entries(state.itemTrait ?? {})) {
+      const it = dd.items.get(Number(id))
+      const base = state.itemNow?.[id]
+      if (!it?.isLegendary || !base || base[0] < minItemGames) continue
+      for (const [foe, cell] of Object.entries(byTrait)) {
+        const tn = state.traitNow?.[foe]
+        if (cell[0] < minPairGames || !tn || tn[0] < 200) continue
+        const dev = cell[1] / cell[0] - base[1] / base[0] - (tn[1] / tn[0] - all)
+        rows.push({ item: it.name, foe, n: cell[0], dev, v: 0.25 / cell[0] })
+      }
     }
   }
   const kOf = (trait) =>

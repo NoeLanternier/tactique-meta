@@ -165,6 +165,23 @@ export function foesAt(timeline, foes, bought, minute, dd, champOf) {
 }
 
 /**
+ * Caractéristiques des objets adverses présentes à une minute donnée ('#antiheal', '#armor'…) :
+ * objets légendaires achetés jusque-là par les adversaires, mêmes seuils que pour la fin de partie
+ * (FOE_TRAIT_MIN). C'est ce que l'app voit en partie au moment d'un achat.
+ */
+export function tagsAt(foes, bought, minute, dd, isFinal) {
+  const count = {}
+  for (const f of foes) {
+    for (const b of bought.get(f.participantId) ?? []) {
+      if (b.min > minute) break
+      if (!isFinal(b.id)) continue
+      for (const t of dd.items.get(b.id)?.traits ?? []) count[t] = (count[t] ?? 0) + 1
+    }
+  }
+  return FOE_TRAITS.filter((t) => (count[t] ?? 0) >= FOE_TRAIT_MIN[t]).map((t) => `#${t}`)
+}
+
+/**
  * Moment des bottes (bottes de niveau 2) par rapport aux objets légendaires : 'early' avant le 1er,
  * 'first' entre le 1er et le 2e, 'later' après le 2e (ou jamais, avec au moins deux objets). Null
  * si la partie est trop courte pour le savoir.
@@ -455,6 +472,8 @@ export function extractPlayers(match, timeline, dd, roles = ROLES, mode = null) 
         const lead = leadAt(timeline, teamOf, p.teamId, min)
         return lead === null ? null : Math.round(lead * 1000) / 1000
       }),
+      // Objets adverses présents à chaque achat (anti-soins, armure…), comme l'app les voit en partie.
+      itemTags: legendaryMin.slice(0, 6).map((min) => tagsAt(foes, bigBuys, min, dd, isFinal)),
       // Adversaires à chaque achat (objets et or dépensé), pour les contextes au moment de l'achat.
       itemFoes: legendaryMin.slice(0, 6).map((min) => foesAt(timeline, foes, bigBuys, min, dd, champOf)),
       // Adversaire très en avance à chaque achat (champion), pour les objets de protection.

@@ -67,7 +67,10 @@ soigne et encaisse davantage : les valeurs observées liaient le contexte à l'i
 9. Mesure, tous champions du poste confondus, chaque objet **face à chaque champion adverse et
    face aux objets adverses** (anti-soins, dégâts en % des PV, boucliers, stase / anti-sorts,
    pénétration, armure, RM, vol de vie, critiques), en retirant l'effet que cet adversaire a sur tout le
-   monde. Ces écarts sont publiés déjà lissés, et seulement s'ils dépassent 0,4 point. Publie
+   monde. Les objets adverses sont ceux **déjà achetés au moment de chaque achat** (ce que l'app voit
+   en partie), et l'achat est jugé à avance égale (victoires en plus de l'attente selon l'écart d'or) ;
+   tant qu'il n'y a pas 20 000 achats mesurés ainsi sur le patch, ce sont les objets de fin de partie.
+   Ces écarts sont publiés déjà lissés, et seulement s'ils dépassent 0,4 point. Publie
    aussi tous les champions vus dans l'équipe adverse, quel que soit leur poste (`threats` :
    parties, taux de victoire de leur équipe, taux de ban), pour les conseils de ban.
 10. **Backtest** : chaque nouvelle partie est comparée à la méta précédente avant d'être ajoutée

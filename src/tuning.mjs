@@ -248,13 +248,15 @@ export function tuningFeatures(meta, rec, contexts, dd) {
     else if (vs) f.choiceCtx += smooth(vs[0], vs[1], base, P.choiceCtx) - base
   }
 
-  // Objets achetés face aux adversaires présents et à leurs objets.
-  const foes = [...(rec.enemies ?? []), rec.enemyJungler, ...(rec.foeTags ?? [])].filter(Boolean)
-  for (const id of rec.items ?? []) {
+  // Objets achetés face aux adversaires présents et à leurs objets (ceux du moment de l'achat
+  // quand ils sont connus, comme l'app en partie ; sinon ceux de fin de partie).
+  const champs = [...(rec.enemies ?? []), rec.enemyJungler].filter(Boolean)
+  ;(rec.items ?? []).forEach((id, k) => {
     const row = meta.itemCounters?.[itemName(id)]
-    if (!row) continue
-    for (const foe of foes) if (row[foe]) f.counter += row[foe][1]
-  }
+    if (!row) return
+    const tags = rec.itemTags?.[k] ?? rec.foeTags ?? []
+    for (const foe of [...champs, ...tags]) if (row[foe]) f.counter += row[foe][1]
+  })
   return f
 }
 
