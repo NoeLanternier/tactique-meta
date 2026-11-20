@@ -87,7 +87,7 @@ soigne et encaisse davantage : les valeurs observées liaient le contexte à l'i
     la veille), mesure combien chaque critère du moteur de l'app prédit réellement la victoire
     (force du champion, jungler adverse, alliés et adversaires, famille de build, runes / bottes /
     familier / compétences, objets face aux adversaires). Chaque critère reçoit un coefficient
-    (1 = poids actuel, borné entre 0 et 2, rapproché de 1 s'il est mal mesuré), publié dans
+    (1 = poids actuel, borné entre 0 et 3, rapproché de 1 s'il est mal mesuré), publié dans
     `meta.json` (`tuning`) dès 2 000 parties : l'app multiplie chaque critère par son coefficient.
 15. **Contrôle des données** : si les runes, les objets, les compétences ou les positions ne sont
     plus trouvés pour la plupart des junglers (format des réponses de Riot changé), la collecte

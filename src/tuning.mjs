@@ -10,7 +10,8 @@
 // Le coefficient de chaque critère dit combien son écart prédit réellement la victoire : 1 = le
 // moteur a le bon poids, 0,5 = il le surestime de moitié, 1,4 = il le sous-estime. L'app multiplie
 // chaque critère par son coefficient. Les coefficients sont rapprochés de 1 selon leur
-// incertitude (un critère mal mesuré garde son poids actuel) et bornés entre 0 et 2.
+// incertitude (un critère mal mesuré garde son poids actuel) et bornés entre 0 et 3 (2 jusqu'au
+// 20 novembre 2026 : plusieurs critères, bien mesurés, y restaient bloqués).
 //
 // Le moteur de l'app (TypeScript) est reproduit ici au plus près. Seule différence : les contextes
 // adverses viennent de ce qui a été observé dans la partie (l'app les estime pendant la draft).
@@ -40,6 +41,8 @@ const PAIR_CAP = 0.06
 export const TUNING_VERSION = 3
 /** Écart-type a priori des coefficients autour de 1 (rapprochement selon l'incertitude). */
 const PRIOR_SD = 0.5
+/** Coefficient maximal d'un critère. */
+export const MAX_WEIGHT = 3
 export const MIN_TUNING_GAMES = 2000
 
 const smooth = (games, wr, prior, k) => (wr * games + prior * k) / (games + k)
@@ -313,7 +316,7 @@ export function solveTuning(t, { minGames = MIN_TUNING_GAMES } = {}) {
     }
     const s = Math.sqrt(sigma2 * Math.max(0, inv[pos][pos]))
     const shrink = (PRIOR_SD * PRIOR_SD) / (PRIOR_SD * PRIOR_SD + s * s)
-    weights[key] = round2(clamp(1 + (w[pos] - 1) * shrink, 0, 2))
+    weights[key] = round2(clamp(1 + (w[pos] - 1) * shrink, 0, MAX_WEIGHT))
     se[key] = round2(s)
   })
   return { v: TUNING_VERSION, games: Math.round(n), weights, se }
