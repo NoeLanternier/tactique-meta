@@ -164,6 +164,74 @@ export function foesAt(timeline, foes, bought, minute, dd, champOf) {
   })
 }
 
+/** Sorts d'invocateur adverses mesurés (identifiants Riot) : Purge, Fatigue, Embrasement. */
+const SETUP_SPELLS = { 1: 'cleanse', 3: 'exhaust', 14: 'ignite' }
+/**
+ * Clés de voûte adverses, par effet : soins (Conquérant, Jeu de jambes, Poigne), vitesse
+ * d'attaque (Tempo mortel, Pluie de lames, Attaque soutenue), burst (Électrocution, Moisson
+ * noire, Comète arcanique, Premier coup), résistance (Poigne, Répercussion, Gardien).
+ */
+const KEYSTONE_TAGS = {
+  8010: ['ksHeal'],
+  8021: ['ksHeal'],
+  8437: ['ksHeal', 'ksTank'],
+  8008: ['ksAs'],
+  9923: ['ksAs'],
+  8005: ['ksAs'],
+  8112: ['ksBurst'],
+  8128: ['ksBurst'],
+  8229: ['ksBurst'],
+  8369: ['ksBurst'],
+  8439: ['ksTank'],
+  8465: ['ksTank']
+}
+/** Nombre d'adversaires à partir duquel le sort ou la clé de voûte compte. */
+export const SETUP_MIN = {
+  cleanse: 1,
+  exhaust: 1,
+  ignite: 2,
+  ksHeal: 2,
+  ksAs: 1,
+  ksBurst: 2,
+  ksTank: 2
+}
+
+/**
+ * Sorts d'invocateur et clés de voûte adverses ('#cleanse', '#ksHeal'…), connus dès le début de la
+ * partie (l'API en jeu les donne à l'app) : mesurés comme les objets adverses.
+ */
+export function setupTagsOf(foes) {
+  const count = {}
+  for (const f of foes) {
+    const seen = new Set()
+    for (const id of [f.summoner1Id, f.summoner2Id]) {
+      const t = SETUP_SPELLS[Number(id)]
+      if (t) seen.add(t)
+    }
+    const keystone = Number(f.perks?.styles?.[0]?.selections?.[0]?.perk)
+    for (const t of KEYSTONE_TAGS[keystone] ?? []) seen.add(t)
+    for (const t of seen) count[t] = (count[t] ?? 0) + 1
+  }
+  return Object.keys(SETUP_MIN)
+    .filter((t) => (count[t] ?? 0) >= SETUP_MIN[t])
+    .map((t) => `#${t}`)
+}
+
+/**
+ * Échange en fin de build : après le 5e objet légendaire, revente d'un objet légendaire suivie,
+ * dans les 5 minutes, de l'achat d'un autre. { sold, bought, min } ou null.
+ */
+export function swapOf(events, timed, fullMin, isFinal) {
+  if (typeof fullMin !== 'number') return null
+  for (const e of events) {
+    const t = (e.timestamp ?? 0) / 60000
+    if (e.type !== 'ITEM_SOLD' || t < fullMin || !isFinal(e.itemId)) continue
+    const buy = timed.find((b) => b.min >= t && b.min <= t + 5 && isFinal(b.id) && b.id !== e.itemId)
+    if (buy) return { sold: e.itemId, bought: buy.id, min: Math.round(t * 10) / 10 }
+  }
+  return null
+}
+
 /**
  * Caractéristiques des objets adverses présentes à une minute donnée ('#antiheal', '#armor'…) :
  * objets légendaires achetés jusque-là par les adversaires, mêmes seuils que pour la fin de partie
@@ -450,6 +518,8 @@ export function extractPlayers(match, timeline, dd, roles = ROLES, mode = null) 
     const enemies = foes.filter((x) => x !== enemyJungler).map(champOf)
 
     const myEvents = events.get(p.participantId) ?? []
+    // Sorts et clés de voûte adverses (connus dès le début de la partie).
+    const setup = setupTagsOf(foes)
     records.push({
       role,
       champ,
@@ -473,7 +543,11 @@ export function extractPlayers(match, timeline, dd, roles = ROLES, mode = null) 
         return lead === null ? null : Math.round(lead * 1000) / 1000
       }),
       // Objets adverses présents à chaque achat (anti-soins, armure…), comme l'app les voit en partie.
-      itemTags: legendaryMin.slice(0, 6).map((min) => tagsAt(foes, bigBuys, min, dd, isFinal)),
+      itemTags: legendaryMin
+        .slice(0, 6)
+        .map((min) => [...tagsAt(foes, bigBuys, min, dd, isFinal), ...setup]),
+      // Échange en fin de build (vendre un objet légendaire, en acheter un autre).
+      swap: swapOf(myEvents, timed, legendaryMin[4], isFinal),
       // Adversaires à chaque achat (objets et or dépensé), pour les contextes au moment de l'achat.
       itemFoes: legendaryMin.slice(0, 6).map((min) => foesAt(timeline, foes, bigBuys, min, dd, champOf)),
       // Adversaire très en avance à chaque achat (champion), pour les objets de protection.
@@ -496,7 +570,7 @@ export function extractPlayers(match, timeline, dd, roles = ROLES, mode = null) 
       allies,
       enemies,
       // Objets adverses de fin de partie qui changent la valeur des nôtres.
-      foeTags: foeTagsOf(foes, dd, mapId),
+      foeTags: [...foeTagsOf(foes, dd, mapId), ...setup],
       // Combats contre le jungler adverse et début de partie (côté, première élimination).
       duels: junglerDuels(timeline, p.participantId, enemyJungler?.participantId),
       opening: jungle ? openingOf(timeline, p.participantId) : null,

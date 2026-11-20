@@ -479,6 +479,86 @@ export function evaluateNext(meta, contexts, rec, bt, dd, oldRecommend) {
   return counted
 }
 
+/** Écart mesuré (score de l'objet suivant) à partir duquel un échange en fin de build est conseillé. */
+export const SWAP_GAIN = 0.02
+
+export function emptySwapBacktest() {
+  // s : échange conseillé (f : l'objet conseillé a été acheté après une revente, d : autre échange,
+  // k : rien changé) ; n : aucun échange conseillé (d : échange quand même, k : rien changé).
+  // Chaque cellule : [parties, victoires en plus de l'attente au 5e objet].
+  return { s: { f: [0, 0], d: [0, 0], k: [0, 0] }, n: { d: [0, 0], k: [0, 0] } }
+}
+
+/**
+ * Échanges en fin de build, jugés avec la méta de la veille : au 5e objet légendaire, l'échange le
+ * plus rentable d'après l'objet suivant (vendre un objet, hors deux premiers objets du cœur, en
+ * acheter un autre, après les autres objets possédés et dans la partie à ce moment). Les joueurs
+ * qui ont fait l'échange conseillé gagnent-ils plus que ceux qui n'ont rien changé ? À avance égale.
+ */
+export function evaluateSwap(meta, contexts, rec, bt, dd) {
+  const build = meta?.builds?.find((b) => b.id === rec.champ)
+  const next = build?.next
+  const k = 4
+  const lead = rec.itemLead?.[k]
+  const p = meta?.lead?.p?.[k]?.[typeof lead === 'number' ? leadBucket(lead) : -1]
+  if (!next || typeof p !== 'number' || (rec.items?.length ?? 0) < 5) return false
+  const names = rec.items.slice(0, 5).map((id) => dd.items.get(Number(id))?.name)
+  if (names.some((n) => !n)) return false
+  const model = meta.nextModel ?? DEFAULT_MODEL
+  const st = STATE_CTX[rec.itemState?.[k]]
+  const fed = rec.itemFedCtx?.[k]
+  const ctx = [
+    ...contextsAt(contexts, rec, k).map((x) => [x, 1]),
+    ...(st ? [[st, 1]] : []),
+    ...(fed ? [[fed, 1]] : [])
+  ]
+  const score = (e) => model.slope * (e.lift + model.gamma * e.share)
+  let best = null
+  for (const o of names.slice(2)) {
+    const others = names.filter((x) => x !== o)
+    const mine = nextEstimate(next, o, others, ctx)
+    if (!mine) continue
+    for (const cand of Object.keys(next.base)) {
+      if (names.includes(cand)) continue
+      const e = nextEstimate(next, cand, others, ctx)
+      if (!e || e.excluded) continue
+      const gain = score(e) - score(mine)
+      if (!best || gain > best.gain) best = { buy: cand, gain }
+    }
+  }
+  if (!best) return false
+  const ex = (rec.win ? 1 : 0) - p
+  const bought = rec.swap ? dd.items.get(Number(rec.swap.bought))?.name : null
+  const cell =
+    best.gain >= SWAP_GAIN
+      ? bought === best.buy
+        ? bt.s.f
+        : rec.swap
+          ? bt.s.d
+          : bt.s.k
+      : rec.swap
+        ? bt.n.d
+        : bt.n.k
+  cell[0] += 1
+  cell[1] += ex
+  return true
+}
+
+/** Résumé publié (meta.backtest.swap). */
+export function swapSummary(bt) {
+  if (!bt) return null
+  const c = ([n, s]) => ({ n, excess: n > 0 ? r4(s / n) : null })
+  const total = bt.s.f[0] + bt.s.d[0] + bt.s.k[0] + bt.n.d[0] + bt.n.k[0]
+  if (!total) return null
+  return {
+    decisions: total,
+    suggested: { followed: c(bt.s.f), other: c(bt.s.d), kept: c(bt.s.k) },
+    notSuggested: { swapped: c(bt.n.d), kept: c(bt.n.k) },
+    // Conseil suivi moins rien changé, quand un échange était conseillé.
+    gain: gainOf({ f: bt.s.f, o: bt.s.k })
+  }
+}
+
 /** Gain mesuré : victoires en plus des achats conformes moins celles des autres, et son erreur. */
 function gainOf({ f, o }) {
   if (!(f[0] > 0) || !(o[0] > 0)) return null

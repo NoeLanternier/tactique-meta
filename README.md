@@ -70,6 +70,9 @@ soigne et encaisse davantage : les valeurs observées liaient le contexte à l'i
    monde. Les objets adverses sont ceux **déjà achetés au moment de chaque achat** (ce que l'app voit
    en partie), et l'achat est jugé à avance égale (victoires en plus de l'attente selon l'écart d'or) ;
    tant qu'il n'y a pas 20 000 achats mesurés ainsi sur le patch, ce sont les objets de fin de partie.
+   Les **sorts d'invocateur et clés de voûte adverses** sont mesurés de la même façon (`#cleanse`,
+   `#exhaust`, `#ignite`, et par effet : `#ksHeal` soins, `#ksAs` vitesse d'attaque, `#ksBurst`,
+   `#ksTank`) : l'API en jeu les donne à l'app dès le début de la partie.
    Ces écarts sont publiés déjà lissés, et seulement s'ils dépassent 0,4 point. Publie
    aussi tous les champions vus dans l'équipe adverse, quel que soit leur poste (`threats` :
    parties, taux de victoire de leur équipe, taux de ban), pour les conseils de ban.
@@ -198,6 +201,12 @@ corrigé par les besoins de la partie (règles, adversaires précis, tes parties
 - calibration : victoires en plus observées par point d'écart prévu (1 : prévisions exactes) ;
 - l'ancien conseil (objets les plus construits selon le contexte), jugé de la même façon sur les
   achats du 4e au 6e objet (`old`).
+
+**Échanges en fin de build** (`backtest.swap`) : au 5e objet légendaire, l'échange le plus rentable
+d'après l'objet suivant (vendre un objet, hors deux premiers objets du cœur, en acheter un autre) est
+calculé avec la méta de la veille. Quand un échange était conseillé (écart d'au moins 2 points), les
+joueurs qui ont acheté l'objet conseillé après une revente sont comparés à ceux qui n'ont rien changé,
+à avance égale (`gain`, avec son erreur type).
 
 Dès 1 000 achats vérifiés, `nextModel` publie le poids de popularité qui a le mieux réussi et la
 pente de calibration (rapprochée de 1 selon son incertitude, bornée entre 0 et 2) : l'app multiplie

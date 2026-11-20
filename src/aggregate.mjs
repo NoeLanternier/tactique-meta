@@ -20,7 +20,9 @@ import {
   addNext,
   buildNext,
   emptyNextBacktest,
+  emptySwapBacktest,
   nextBacktestSummary,
+  swapSummary,
   nextModel,
   pooledNext,
   publishLead
@@ -70,7 +72,9 @@ export function emptyBacktest() {
     variant: { followed: [0, 0], other: [0, 0] },
     items: { high: [0, 0], low: [0, 0] },
     // Objet suivant (3e au 6e objet), à avance égale : voir nextItems.mjs.
-    next: emptyNextBacktest()
+    next: emptyNextBacktest(),
+    // Échanges en fin de build : voir nextItems.mjs evaluateSwap.
+    swap: emptySwapBacktest()
   }
 }
 
@@ -122,6 +126,7 @@ export function upgradeState(state) {
   state.foeAll ??= {}
   state.backtest ??= emptyBacktest()
   state.backtest.next ??= emptyNextBacktest()
+  state.backtest.swap ??= emptySwapBacktest()
   state.lead ??= {}
   // Critères du réglage changés (voir TUNING_VERSION) : il repart de zéro.
   if (state.tuning?.v !== TUNING_VERSION) state.tuning = emptyTuning()
@@ -1235,12 +1240,14 @@ export function backtestSummary(bt) {
   if (!bt || bt.games === 0) return null
   const cell = (x) => ({ games: Math.round(x[0]), winRate: rateOf(x) })
   const next = nextBacktestSummary(bt.next)
+  const swap = swapSummary(bt.swap)
   return {
     v: 2,
     games: bt.games,
     variant: { followed: cell(bt.variant.followed), other: cell(bt.variant.other) },
     items: { high: cell(bt.items.high), low: cell(bt.items.low) },
-    ...(next ? { next } : {})
+    ...(next ? { next } : {}),
+    ...(swap ? { swap } : {})
   }
 }
 

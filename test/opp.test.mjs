@@ -326,3 +326,40 @@ test('objets face aux objets adverses présents au moment de l’achat', async (
   const counters = buildItemCounters(state, dd, { minItemGames: 100, minPairGames: 40 })
   assert.ok(counters.Pen?.['#armor']?.[1] > 0.004, JSON.stringify(counters.Pen))
 })
+
+test('sorts et clés de voûte adverses, échanges en fin de build', async () => {
+  const { setupTagsOf, swapOf } = await import('../src/extract.mjs')
+  const { evaluateSwap, emptySwapBacktest, swapSummary } = await import('../src/nextItems.mjs')
+  const foe = (s1, s2, ks) => ({ summoner1Id: s1, summoner2Id: s2, perks: { styles: [{ selections: [{ perk: ks }] }] } })
+  // Purge chez un adversaire, deux Conquérants (soins), un Tempo mortel (vitesse d'attaque).
+  const tags = setupTagsOf([foe(4, 1, 8010), foe(4, 14, 8010), foe(4, 12, 8008), foe(4, 11, 8112), foe(4, 7, 8214)])
+  assert.deepEqual(tags.sort(), ['#cleanse', '#ksAs', '#ksHeal'])
+  // Échange : revente d'un objet légendaire après le 5e, puis achat d'un autre dans les 5 minutes.
+  const isFinal = (id) => id >= 10
+  const events = [{ type: 'ITEM_SOLD', itemId: 12, timestamp: 31 * 60000 }]
+  const timed = [{ id: 15, min: 32 }]
+  assert.deepEqual(swapOf(events, timed, 30, isFinal), { sold: 12, bought: 15, min: 31 })
+  assert.equal(swapOf(events, timed, 33, isFinal), null)
+  assert.equal(swapOf([{ type: 'ITEM_SOLD', itemId: 2, timestamp: 31 * 60000 }], timed, 30, isFinal), null)
+  // Backtest : après A, B, C, X, Y, la mesure conseille d'échanger Y contre Pen.
+  const meta = {
+    builds: [{
+      id: 'Garen',
+      next: { n: 1000, base: { X: [300, 0, 0.3], Y: [300, -0.02, 0.3], Pen: [300, 0.03, 0.2], C: [300, 0, 0.5] }, after: {}, ctx: {} }
+    }],
+    lead: { p: { 4: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5] } },
+    nextModel: { gamma: 0, slope: 1 }
+  }
+  const dd4 = { items: new Map([[1, { name: 'A' }], [2, { name: 'B' }], [3, { name: 'C' }], [4, { name: 'X' }], [5, { name: 'Y' }], [7, { name: 'Pen' }]]) }
+  const bt = emptySwapBacktest()
+  const r = (win, swap) => ({ champ: 'Garen', win, items: [1, 2, 3, 4, 5], itemLead: [0, 0, 0, 0, 0], itemState: ['e', 'e', 'e', 'e', 'e'], swap })
+  assert.ok(evaluateSwap(meta, ['all'], r(true, { sold: 5, bought: 7 }), bt, dd4))
+  evaluateSwap(meta, ['all'], r(false, null), bt, dd4)
+  evaluateSwap(meta, ['all'], r(false, { sold: 4, bought: 3 }), bt, dd4)
+  assert.deepEqual(bt.s.f, [1, 0.5])
+  assert.deepEqual(bt.s.k, [1, -0.5])
+  assert.equal(bt.s.d[0], 1)
+  const sum = swapSummary(bt)
+  assert.equal(sum.decisions, 3)
+  assert.equal(sum.gain.gain, 1)
+})

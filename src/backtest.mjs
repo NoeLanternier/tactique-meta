@@ -19,7 +19,7 @@
 
 import { DEFAULT_PRIORS } from './priors.mjs'
 import { posterior } from './stats.mjs'
-import { evaluateNext } from './nextItems.mjs'
+import { evaluateNext, evaluateSwap } from './nextItems.mjs'
 
 /**
  * Famille recommandée pour une partie : meilleur taux estimé dans les contextes de la partie, et
@@ -95,5 +95,7 @@ export function evaluateRecord(meta, contexts, rec, bt, dd) {
   }
   // Objet suivant (3e au 6e objet) : conseil de la veille, à avance égale (voir nextItems.mjs).
   if (bt.next && evaluateNext(meta, contexts, rec, bt.next, dd, recommendedItems)) counted = true
+  // Échanges en fin de build (vendre un objet, en acheter un autre) : conseil de la veille.
+  if (bt.swap && evaluateSwap(meta, contexts, rec, bt.swap, dd)) counted = true
   if (counted) bt.games++
 }
