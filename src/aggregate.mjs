@@ -17,8 +17,10 @@ import {
 } from './priors.mjs'
 import { legendaryOn } from './ddragon.mjs'
 import {
+  addDefense,
   addNext,
   buildNext,
+  defenseSummary,
   emptyNextBacktest,
   emptySwapBacktest,
   nextBacktestSummary,
@@ -28,6 +30,7 @@ import {
   publishLead
 } from './nextItems.mjs'
 import { MODES } from './modes.mjs'
+import { choicesSummary } from './backtest.mjs'
 
 export const STATE_VERSION = 7
 /**
@@ -74,7 +77,10 @@ export function emptyBacktest() {
     // Objet suivant (3e au 6e objet), à avance égale : voir nextItems.mjs.
     next: emptyNextBacktest(),
     // Échanges en fin de build : voir nextItems.mjs evaluateSwap.
-    swap: emptySwapBacktest()
+    swap: emptySwapBacktest(),
+    // Runes, bottes, départ, compétences, familier, moment des bottes, sorts : choix conseillé
+    // suivi ou non (voir backtest.mjs evaluateChoices).
+    choice: {}
   }
 }
 
@@ -127,6 +133,8 @@ export function upgradeState(state) {
   state.backtest ??= emptyBacktest()
   state.backtest.next ??= emptyNextBacktest()
   state.backtest.swap ??= emptySwapBacktest()
+  state.backtest.choice ??= {}
+  state.defense ??= {}
   state.lead ??= {}
   // Critères du réglage changés (voir TUNING_VERSION) : il repart de zéro.
   if (state.tuning?.v !== TUNING_VERSION) state.tuning = emptyTuning()
@@ -394,6 +402,9 @@ export function addRecord(state, rec) {
   }
   // 4e au 6e objet : chaque achat comparé aux autres décisions prises au même moment.
   const expect = addNext(state, c, rec, contexts)
+  // Défense face à une menace (adversaire très en avance, qui te tue, équipe en retard), à avance
+  // égale : voir nextItems.mjs addDefense.
+  addDefense(state, rec, expect)
   // Objets face aux objets adverses présents au moment de l'achat, à avance égale : victoires en
   // plus de l'attente (écart d'or à cet achat), [achats, somme des victoires en plus].
   items.forEach((id, k) => {
@@ -562,6 +573,7 @@ export function seedFromPrevious(state, previous, factor = 0.25) {
   // Objets face aux objets adverses au moment de l'achat (victoires en plus).
   state.nowAll = scaleDeep(previous.nowAll ?? [0, 0], factor)
   state.nowVar = scaleDeep(previous.nowVar ?? [0, 0], factor)
+  state.defense = scaleDeep(previous.defense ?? {}, factor)
   state.itemNow = scaleDeep(previous.itemNow ?? {}, factor)
   state.traitNow = scaleDeep(previous.traitNow ?? {}, factor)
   state.itemTrait = scaleDeep(previous.itemTrait ?? {}, factor)
@@ -1275,13 +1287,15 @@ export function backtestSummary(bt) {
   const cell = (x) => ({ games: Math.round(x[0]), winRate: rateOf(x) })
   const next = nextBacktestSummary(bt.next)
   const swap = swapSummary(bt.swap)
+  const choices = choicesSummary(bt.choice)
   return {
     v: 2,
     games: bt.games,
     variant: { followed: cell(bt.variant.followed), other: cell(bt.variant.other) },
     items: { high: cell(bt.items.high), low: cell(bt.items.low) },
     ...(next ? { next } : {}),
-    ...(swap ? { swap } : {})
+    ...(swap ? { swap } : {}),
+    ...(choices ? { choices } : {})
   }
 }
 
@@ -1545,6 +1559,11 @@ export function buildMeta(state, dd0, previousMeta, options = {}) {
     // précédent font paraître nuls tous les effets en début de patch, voir noiseScale.)
     itemCounters: buildItemCounters(state, dd, { noise: priors.noise ?? 1 }),
     backtest: backtestSummary(state.backtest),
+    // Défense face à une menace, mesurée à avance égale : l'app ne la privilégie que si elle gagne.
+    ...(() => {
+      const defense = defenseSummary(state)
+      return defense ? { defense } : {}
+    })(),
     // Objet suivant : victoire attendue selon l'avance, et modèle vérifié par le backtest.
     ...(() => {
       const lead = publishLead(state)

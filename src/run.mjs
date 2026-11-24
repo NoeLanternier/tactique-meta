@@ -48,7 +48,7 @@ import {
   upgradeState
 } from './aggregate.mjs'
 import { evaluateRecord } from './backtest.mjs'
-import { fedContexts, purchaseContexts } from './nextItems.mjs'
+import { purchaseContexts, threatContexts } from './nextItems.mjs'
 import { poolEvidence } from './priors.mjs'
 import { addTuning, tuningFeatures } from './tuning.mjs'
 import { emptyQuality, qualityIssues, recordQuality } from './quality.mjs'
@@ -396,7 +396,7 @@ async function main() {
       for (const rec of extractModePlayers(match, timeline, dd, run.mode)) {
         rec.enemy = expectedEnemy(profiles, rec.enemies ?? [])
         rec.ally = expectedEnemy(profiles, rec.allies ?? [])
-        rec.itemFedCtx = fedContexts(profiles, rec.itemFed)
+        rec.itemFedCtx = threatContexts(profiles, rec.itemFoes, rec.itemFocus)
         rec.itemComp = purchaseContexts(profiles, rec.itemFoes)
         if (
           run.previous?.patch === dd.patch &&
@@ -459,7 +459,7 @@ async function main() {
           )
           // Sa propre équipe (4 alliés), et adversaire très en avance à chaque achat d'objet.
           rec.ally = expectedEnemy(main.profiles, rec.allies ?? [])
-          rec.itemFedCtx = fedContexts(main.profiles, rec.itemFed)
+          rec.itemFedCtx = threatContexts(main.profiles, rec.itemFoes, rec.itemFocus)
           rec.itemComp = purchaseContexts(main.profiles, rec.itemFoes)
           // Type d'adversaire direct (distance ou mêlée, dégâts magiques ou physiques).
           rec.lane = laneContexts(main.profiles, dd, rec.enemyJungler)

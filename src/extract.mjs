@@ -398,6 +398,52 @@ export function junglerDuels(timeline, me, foe) {
 }
 
 /**
+ * Adversaire qui cause la plupart des morts récentes d'un joueur à une minute donnée, calculé comme
+ * l'app en partie (deathFocus) : 1 par mort dont il est l'auteur, 0,5 par assistance, une mort
+ * comptant moitié moins toutes les 10 minutes ; il faut l'équivalent de deux morts. Renvoie son
+ * identifiant de participant si sa part atteint 50 %, sinon null.
+ */
+export function killerFocusAt(timeline, me, minute, foeIds) {
+  const deaths = []
+  for (const frame of timeline?.info?.frames ?? []) {
+    for (const e of frame.events ?? []) {
+      if (e.type !== 'CHAMPION_KILL' || e.victimId !== me) continue
+      const t = (e.timestamp ?? 0) / 60000
+      if (t <= minute) deaths.push([t, e.killerId, e.assistingParticipantIds ?? []])
+    }
+  }
+  if (!deaths.length) return null
+  const recency = (t) => 0.5 ** (Math.max(0, minute - t) / 10)
+  let total = 0
+  const share = new Map()
+  const add = (pid, x) => {
+    if (foeIds.has(pid)) share.set(pid, (share.get(pid) ?? 0) + x)
+  }
+  for (const [t, killer, assists] of deaths) {
+    const r = recency(t)
+    total += r
+    add(killer, r)
+    for (const a of assists) add(a, 0.5 * r)
+  }
+  let best = null
+  for (const [pid, x] of share) {
+    const f = x / Math.max(total, 2)
+    if (!best || f > best[1]) best = [pid, f]
+  }
+  return best && best[1] >= 0.5 ? best[0] : null
+}
+
+/** Statistiques défensives d'un objet : 'a' armure, 'm' résistance magique, 'h' PV. */
+export function defenseOf(item) {
+  const s = item?.stats ?? {}
+  return (
+    ((s.FlatArmorMod ?? 0) > 0 ? 'a' : '') +
+    ((s.FlatSpellBlockMod ?? 0) > 0 ? 'm' : '') +
+    ((s.FlatHPPoolMod ?? 0) > 0 ? 'h' : '')
+  )
+}
+
+/**
  * Début de partie d'un jungler : côté de la carte où il est à 2 minutes (premier camp) et sa
  * première participation à une élimination (minute, voie).
  */
@@ -518,6 +564,7 @@ export function extractPlayers(match, timeline, dd, roles = ROLES, mode = null) 
     const enemies = foes.filter((x) => x !== enemyJungler).map(champOf)
 
     const myEvents = events.get(p.participantId) ?? []
+    const foeIds = new Set(foes.map((x) => Number(x.participantId)))
     // Sorts et clés de voûte adverses (connus dès le début de la partie).
     const setup = setupTagsOf(foes)
     records.push({
@@ -550,12 +597,15 @@ export function extractPlayers(match, timeline, dd, roles = ROLES, mode = null) 
       swap: swapOf(myEvents, timed, legendaryMin[4], isFinal),
       // Adversaires à chaque achat (objets et or dépensé), pour les contextes au moment de l'achat.
       itemFoes: legendaryMin.slice(0, 6).map((min) => foesAt(timeline, foes, bigBuys, min, dd, champOf)),
-      // Adversaire très en avance à chaque achat (champion), pour les objets de protection.
-      itemFed: legendaryMin.slice(0, 6).map((min) => {
-        const pid = fedAt(timeline, teamOf, p.teamId, min)
-        const x = pid ? info.participants.find((q) => Number(q.participantId) === pid) : null
+      // Adversaire qui cause la plupart de tes morts récentes à chaque achat (champion) ; l'adversaire
+      // très en avance se lit dans itemFoes (or dépensé, voir threatContexts).
+      itemFocus: legendaryMin.slice(0, 6).map((min) => {
+        const pid = killerFocusAt(timeline, p.participantId, min, foeIds)
+        const x = pid ? foes.find((q) => Number(q.participantId) === pid) : null
         return x ? champOf(x) : null
       }),
+      // Statistiques défensives de chaque objet acheté (armure, RM, PV), pour mesurer la défense.
+      itemDef: legendaries.slice(0, 6).map((id) => defenseOf(dd.items.get(id))),
       boots,
       bootsT: bootsTiming(bootsBuy?.min, legendaryMin),
       pet,

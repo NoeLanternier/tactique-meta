@@ -13,13 +13,20 @@
 //   victoires en plus par rapport à la victoire attendue selon l'écart d'or à cet achat (voir
 //   nextItems.mjs), avec l'ancien conseil jugé de la même façon pour comparaison.
 //
+// - Runes, bottes, départ, ordre des compétences, familier, moment des bottes et sorts : le
+//   joueur a-t-il pris l'option que l'app lui aurait conseillée (celle du build, ou une autre si
+//   elle gagne nettement plus dans les contextes de sa partie) ? Victoires en plus du taux du
+//   champion, conseil suivi moins autres ; et, quand l'app aurait changé d'option, si ce changement
+//   a payé (evaluateChoices).
+//
 // C'est une mesure indirecte (les joueurs qui suivent la méta ne sont pas forcément les mêmes que
 // les autres), mais elle permet de vérifier collecte après collecte que les changements vont dans
 // le bon sens : l'écart entre « suivi » et « autre » doit rester positif.
 
 import { DEFAULT_PRIORS } from './priors.mjs'
 import { posterior } from './stats.mjs'
-import { evaluateNext, evaluateSwap } from './nextItems.mjs'
+import { evaluateNext, evaluateSwap, gainOf } from './nextItems.mjs'
+import { runesFromSig } from './aggregate.mjs'
 
 /**
  * Famille recommandée pour une partie : meilleur taux estimé dans les contextes de la partie, et
@@ -68,6 +75,150 @@ function inc(cell, win) {
 
 const STATE_CONTEXT = { a: 'ahead', b: 'behind' }
 
+/** Choix vérifiés, comme l'app les adapte (choices.ts adaptChoices). */
+export const CHOICE_PROOF = ['runes', 'boots', 'start', 'skills', 'pet', 'bootsT', 'spells']
+/** Contextes utilisés par l'app pour adapter ces choix (composition, alliés, adversaire direct). */
+const CHOICE_CONTEXTS = ['ap', 'ad', 'heal', 'tank', 'cc', 'allyAp', 'allyAd', 'vsRanged', 'vsMelee', 'vsAp', 'vsAd']
+/** Comme l'app : une autre option remplace celle du build si elle gagne 0,3 point de plus ici. */
+const MIN_SWITCH = 0.003
+const MIN_OPTION_GAMES = 40
+
+const shrunk = (games, rate, prior, k) => (rate * games + prior * k) / (games + k)
+const norm = (x) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
+const sameRunes = (a, b) =>
+  !!a &&
+  !!b &&
+  norm(a.keystone) === norm(b.keystone) &&
+  norm(a.secondaryTree) === norm(b.secondaryTree) &&
+  (a.primary ?? []).every((r, i) => norm(r) === norm(b.primary?.[i]))
+const sameSet = (a, b) =>
+  !!a && !!b && a.length === b.length && [...a].map(norm).sort().join() === [...b].map(norm).sort().join()
+
+/**
+ * Option conseillée par l'app (choices.ts pick) : celle du build, sauf si une autre gagne nettement
+ * plus dans les contextes de la partie (écarts lissés comme l'app, poids du réglage automatique).
+ * Renvoie l'option de remplacement, ou null (option du build).
+ */
+export function recommendedChoice(list, isCurrent, contexts, prior, kBase, kCtx, tuning, opponent) {
+  if (!Array.isArray(list) || list.length < 2) return null
+  const wBase = tuning?.weights?.choiceBase ?? 1
+  const wCtx = tuning?.weights?.choiceCtx ?? 1
+  const ctx = contexts.filter((c) => CHOICE_CONTEXTS.includes(c))
+  const scored = list.map((c) => {
+    const base = prior + wBase * (shrunk(c.games ?? 0, c.winRate ?? prior, prior, kBase) - prior)
+    let sum = 0
+    let n = 0
+    for (const x of ctx) {
+      const cell = c.contexts?.[x]
+      if (!cell) continue
+      sum += shrunk(cell[0], cell[1], base, kCtx) - base
+      n++
+    }
+    const vs = opponent ? (c.opp?.[opponent]?.[1] ?? 0) : 0
+    return { c, base, shift: wCtx * (sum / Math.max(1, n) + vs) }
+  })
+  const cur = scored.find((x) => isCurrent(x.c))
+  if (!cur) return null
+  const gain = (x) => Math.min(0, x.base - cur.base) + (x.shift - cur.shift)
+  const best = scored
+    .filter((x) => x !== cur && (x.c.games ?? 0) >= MIN_OPTION_GAMES)
+    .sort((a, b) => gain(b) - gain(a))[0]
+  return best && gain(best) >= MIN_SWITCH ? best.c : null
+}
+
+const mostShared = (list) => [...(list ?? [])].sort((a, b) => (b.share ?? 0) - (a.share ?? 0))[0]
+
+/** Compteurs d'un type de choix : f / o (conseil suivi / autres), s : quand l'app aurait changé d'option. */
+const emptyChoiceCell = () => ({ f: [0, 0], o: [0, 0], s: { f: [0, 0], o: [0, 0] } })
+
+/**
+ * Runes, bottes, départ, compétences, familier, moment des bottes et sorts : chaque partie est
+ * comparée à l'option que l'app aurait conseillée avec la méta de la veille. Victoires en plus du
+ * taux du champion (son niveau retiré), conseil suivi moins autres.
+ */
+export function evaluateChoices(meta, contexts, rec, bt, dd) {
+  const build = meta?.builds?.find((b) => b.id === rec.champ)
+  if (!build) return false
+  const ch = build.choices ?? {}
+  const pr = { ...DEFAULT_PRIORS, ...(meta.priors ?? {}) }
+  const prior = build.winRate ?? 0.5
+  const ex = (rec.win ? 1 : 0) - prior
+  const name = (id) => (id ? (dd.items.get(Number(id))?.name ?? null) : null)
+  const opponent = rec.enemyJungler ?? null
+  let runes = null
+  try {
+    runes = rec.runeSig ? runesFromSig(rec.runeSig, dd) : null
+  } catch {
+    runes = null
+  }
+  const usualT = build.bootsTiming ?? mostShared(ch.bootsT)?.value
+  const usualSpells = build.spells ?? mostShared(ch.spells)?.ids
+  const kinds = {
+    runes: [ch.runes, (o) => sameRunes(o.runes, build.runes), build.runes, (o) => o.runes, runes, sameRunes],
+    boots: [ch.boots, (o) => norm(o.name) === norm(build.boots), build.boots, (o) => o.name, name(rec.boots), (a, b) => norm(a) === norm(b)],
+    start: [
+      ch.start,
+      (o) => sameSet(o.items, build.start),
+      build.start,
+      (o) => o.items,
+      rec.start ? String(rec.start).split(',').map(name).filter(Boolean) : null,
+      sameSet
+    ],
+    skills: [ch.skills, (o) => o.value === build.skills, build.skills, (o) => o.value, rec.skills, (a, b) => a === b],
+    pet: [ch.pet, (o) => norm(o.name) === norm(build.pet), build.pet, (o) => o.name, name(rec.pet), (a, b) => norm(a) === norm(b)],
+    bootsT: [ch.bootsT, (o) => o.value === usualT, usualT, (o) => o.value, rec.bootsT, (a, b) => a === b],
+    spells: [
+      ch.spells,
+      (o) => sameSet((o.ids ?? []).map(String), (usualSpells ?? []).map(String)),
+      usualSpells,
+      (o) => o.ids,
+      rec.spells ? String(rec.spells).split(',') : null,
+      (a, b) => sameSet(a.map(String), b.map(String))
+    ]
+  }
+  let counted = false
+  for (const kind of CHOICE_PROOF) {
+    const [list, isCurrent, usual, valueOf, actual, same] = kinds[kind]
+    if (!usual || actual === null || actual === undefined) continue
+    const picked = recommendedChoice(
+      list,
+      isCurrent,
+      contexts,
+      prior,
+      pr[kind] ?? DEFAULT_PRIORS.choiceCtx,
+      pr.choiceCtx ?? DEFAULT_PRIORS.choiceCtx,
+      meta.tuning,
+      opponent
+    )
+    const wanted = picked ? valueOf(picked) : usual
+    if (!wanted) continue
+    const cell = (bt[kind] ??= emptyChoiceCell())
+    const followed = same(actual, wanted)
+    const side = followed ? cell.f : cell.o
+    side[0] += 1
+    side[1] = Math.round((side[1] + ex) * 10000) / 10000
+    if (picked) {
+      const sw = followed ? cell.s.f : cell.s.o
+      sw[0] += 1
+      sw[1] = Math.round((sw[1] + ex) * 10000) / 10000
+    }
+    counted = true
+  }
+  return counted
+}
+
+/** Résumé publié (meta.backtest.choices) : gain du conseil suivi par type de choix. */
+export function choicesSummary(bt) {
+  const out = {}
+  for (const [kind, cell] of Object.entries(bt ?? {})) {
+    const g = gainOf({ f: cell.f, o: cell.o })
+    if (!g) continue
+    const sw = gainOf({ f: cell.s.f, o: cell.s.o })
+    out[kind] = { ...g, ...(sw ? { switched: sw } : {}) }
+  }
+  return Object.keys(out).length ? out : null
+}
+
 /** Compare une partie aux recommandations de `meta` et met à jour les compteurs `bt`. */
 export function evaluateRecord(meta, contexts, rec, bt, dd) {
   const build = meta?.builds?.find((b) => b.id === rec.champ)
@@ -97,5 +248,7 @@ export function evaluateRecord(meta, contexts, rec, bt, dd) {
   if (bt.next && evaluateNext(meta, contexts, rec, bt.next, dd, recommendedItems)) counted = true
   // Échanges en fin de build (vendre un objet, en acheter un autre) : conseil de la veille.
   if (bt.swap && evaluateSwap(meta, contexts, rec, bt.swap, dd)) counted = true
+  // Runes, bottes, départ, compétences… : option que l'app aurait conseillée.
+  if (bt.choice && evaluateChoices(meta, contexts, rec, bt.choice, dd)) counted = true
   if (counted) bt.games++
 }

@@ -83,8 +83,9 @@ soigne et encaisse davantage : les valeurs observées liaient le contexte à l'i
 10. **Backtest** : chaque nouvelle partie est comparée à la méta précédente avant d'être ajoutée
     (famille recommandée suivie ou non ; chaque achat du 4e au 6e objet parmi les objets
     conseillés à ce moment, ou non, comparés au même rang ; et le conseil d'objet suivant, à or
-    égal, voir « Objet suivant »). Le taux de victoire des groupes est publié dans `meta.json`
-    (`backtest`) et dans le journal.
+    égal, voir « Objet suivant » ; et les runes, bottes, départ, compétences, familier, moment des
+    bottes et sorts que l'app aurait conseillés, voir « Choix de début de partie »). Le taux de
+    victoire des groupes est publié dans `meta.json` (`backtest`) et dans le journal.
 11. Mesure par contexte adverse les **options courantes** de chaque champion (pages de runes, aussi
     par famille de build ; bottes ; familier, aussi selon le jungler adverse ; ordre des
     compétences) : l'app garde le choix du build sauf si une autre option gagne nettement plus.
@@ -171,12 +172,14 @@ Validation hors échantillon (parties du 10 et 11 novembre prédites avec la mé
 l'ancien lissage fixe, l'effet prédit d'un affrontement direct était 4 à 20 fois trop fort, et la
 prédiction était moins bonne que de ne rien prédire ; avec le lissage mesuré, elle est calibrée.
 
-## Objet suivant (3e au 6e objet)
+## Objet suivant (2e au 6e objet)
 
-Chaque achat du 3e au 6e objet légendaire est mesuré **selon ce qui est déjà possédé et selon la
-partie**, à **or égal** (`src/nextItems.mjs`, publié dans `builds[].next`). Le 3e objet complète le
-cœur : l'app ne le remplace que si un autre gagne nettement plus après les deux premiers dans cette
-partie (par exemple face à un adversaire très en avance).
+Chaque achat du 2e au 6e objet légendaire est mesuré **selon ce qui est déjà possédé et selon la
+partie**, à **or égal** (`src/nextItems.mjs`, publié dans `builds[].next` ; 2e objet ajouté le
+24 novembre 2026). Les 2e et 3e objets complètent le cœur : l'app ne remplace le 3e que si un autre
+gagne nettement plus après les deux premiers dans cette partie (par exemple face à un adversaire très
+en avance), et le 2e seulement si la preuve du 2e objet (`backtest.next.ranks['1']`) est nettement
+positive, avec un écart plus grand (≈ 2 points).
 
 - **À or égal.** Un objet acheté surtout en menant gagne souvent… parce qu'on menait. Chaque achat
   est donc comparé à la victoire attendue selon l'écart d'or de l'équipe à ce moment (courbe par
@@ -189,9 +192,12 @@ partie (par exemple face à un adversaire très en avance).
   physiques et équipe critique **au moment de l'achat**, d'après les objets que les adversaires ont
   déjà achetés à cette minute, comme l'app les voit en partie ; soins, résistance, contrôles) et
   alliée (voir « Équipe alliée »), avec l'avance ou le
-  retard au moment de l'achat, et avec un **adversaire très en avance** à ce moment (au moins 30 %
-  d'or de plus que la moyenne de son équipe et 1 500 pièces d'or de plus), selon ses dégâts
-  (`fedAp` : surtout magiques, `fedAd` : surtout physiques). L'app impose toujours un objet
+  retard au moment de l'achat, et avec une **menace** à ce moment, définie exactement comme dans
+  l'app (`threatContexts`) : l'adversaire qui a le plus d'objets (or dépensé), s'il en a au moins
+  30 % de plus que la moyenne de son équipe et 1 500 pièces d'or de plus, ou celui qui cause la
+  plupart de tes morts récentes (1 par mort, 0,5 par assistance, moitié moins toutes les 10 minutes,
+  au moins la moitié, `itemFocus`), selon ses dégâts du moment (profil corrigé par ses objets ;
+  `fedAp` : surtout magiques, `fedAd` : surtout physiques). L'app impose toujours un objet
   anti-soins face à une équipe qui soigne beaucoup, sauf si la mesure le contredit pour ce
   champion.
 - **Lissage mesuré**, comme le reste (`priors.nx0`, `nxJ`, `nxC`) : l'écart propre est rapproché
@@ -212,7 +218,15 @@ corrigé par les besoins de la partie (règles, adversaires précis, tes parties
   « pente de décision » : gain observé ÷ écart prévu (`slope`, `se`, dès 1 000 achats de chaque
   côté) ;
 - l'ancien conseil (objets les plus construits selon le contexte), jugé de la même façon sur les
-  achats du 4e au 6e objet (`old`).
+  achats du 4e au 6e objet (`old`) ;
+- le gain par rang avec le poids retenu (`ranks` : '1' = 2e objet… '5' = 6e objet).
+
+**Défense face à une menace** (`meta.defense`) : quand une menace fait surtout des dégâts magiques
+(`fedAp`) ou physiques (`fedAd`), ou quand l'équipe est en retard (`behind`), les achats défensifs
+adaptés (RM, armure ; en retard, armure, RM ou PV) sont comparés aux autres achats faits dans la
+même situation, à avance égale (`gain`, `se`). L'app ne donne la priorité à la défense (règles
+écrites à la main) que là où elle est nettement gagnante ; ailleurs, l'objet suivant mesuré, qui
+tient compte de ces situations, décide.
 
 **Échanges en fin de build** (`backtest.swap`) : au 5e objet légendaire, l'échange le plus rentable
 d'après l'objet suivant (vendre un objet, hors deux premiers objets du cœur, en acheter un autre) est
@@ -235,6 +249,17 @@ est affiché dans l'app (Réglages, « Qualité du moteur », et Bilan, « L'app
 Mesure sur les vraies parties avant ce modèle (backtest publié par les six métas) : acheter un
 des trois objets les plus construits selon le contexte ne gagnait pas plus que les autres achats
 (de −0,5 à +0,8 point selon la méta), d'où ce modèle.
+
+## Choix de début de partie
+
+Runes, bottes, départ, ordre des compétences, familier, moment des bottes et sorts d'invocateur :
+chaque nuit, chaque partie est comparée à l'option que l'app aurait conseillée avec la méta de la
+veille (celle du build, ou une autre si elle gagne nettement plus dans les contextes de la partie,
+calculée comme l'app : `backtest.mjs recommendedChoice`). Publié dans `backtest.choices` : victoires
+en plus du taux du champion, conseil suivi moins autres (`gain`, `se`), et `switched` : la même
+mesure dans les parties où l'app aurait changé d'option. L'app remplace l'option du build par la
+plus jouée si elle est nettement perdante (sur au moins 1 000 parties de chaque côté), et cesse de
+changer d'option selon la partie si ce changement est nettement perdant.
 
 ## Adversaire direct, équipe alliée et moment des bottes
 

@@ -19,13 +19,15 @@
 import { momPrior, posterior } from './stats.mjs'
 
 /**
- * Rangs évalués (0 = 1er objet légendaire) : du 3e au 6e objet. Le 3e objet complète le cœur ; le
- * mesurer ici permet de le remplacer quand la partie l'exige (adversaire très en avance…).
+ * Rangs évalués (0 = 1er objet légendaire) : du 2e au 6e objet. Les 2e et 3e objets complètent le
+ * cœur ; les mesurer ici permet de les remplacer quand la partie l'exige (adversaire très en
+ * avance…). (2e objet ajouté le 24 novembre 2026, avec sa propre preuve : backtest.next.ranks.)
  */
-export const NEXT_RANKS = [2, 3, 4, 5]
+export const NEXT_RANKS = [1, 2, 3, 4, 5]
 /**
- * Contextes : composition adverse et alliée, avance ou retard au moment de l'achat, et adversaire
- * très en avance à ce moment, selon ses dégâts (fedAp : surtout magiques, fedAd : physiques).
+ * Contextes : composition adverse et alliée, avance ou retard au moment de l'achat, et menace à ce
+ * moment, selon ses dégâts (fedAp : surtout magiques, fedAd : physiques) : adversaire très en
+ * avance ou qui cause la plupart de tes morts récentes (voir threatContexts).
  */
 export const NEXT_CONTEXTS = [
   'ap',
@@ -45,6 +47,60 @@ export const NEXT_CONTEXTS = [
 /** Passifs qui multiplient les chances de critique (comme l'app). */
 const CRIT_KIT = { Yasuo: 2, Yone: 2 }
 
+const clamp01 = (x) => Math.max(0, Math.min(1, x))
+
+/**
+ * Part magique des dégâts d'un adversaire, comme l'app en partie (liveProfile) : son profil mesuré,
+ * corrigé par l'écart de ses objets du moment (valeurs en or magiques / physiques) à ceux qu'il
+ * construit d'habitude. Sans profil : ses objets seuls (0,5 s'il n'en a pas).
+ */
+export function foeApShare(p, apVal = 0, adVal = 0) {
+  const dmg = p ? (p.phys ?? 0) + (p.magic ?? 0) : 0
+  const itemAp = apVal + adVal > 0 ? apVal / (apVal + adVal) : null
+  if (!p || !(dmg > 0) || (p.g ?? 0) < 20) return itemAp ?? 0.5
+  const baseAp = p.magic / dmg
+  if (itemAp === null) return baseAp
+  const baseItemAp = (p.itemN ?? 0) >= 10 ? p.itemAp / p.itemN : null
+  const dmgKnown = clamp01((apVal + adVal) / 6000)
+  return baseItemAp !== null
+    ? clamp01(baseAp + 0.8 * dmgKnown * (itemAp - baseItemAp))
+    : (1 - 0.75 * dmgKnown) * baseAp + 0.75 * dmgKnown * itemAp
+}
+
+/** Adversaire très en avance : 30 % d'objets de plus que la moyenne de son équipe et 1 500 d'écart. */
+export const FED_RATIO = 1.3
+export const FED_GAP = 1500
+
+/**
+ * Menace au moment de chaque achat, définie comme dans l'app (threat.ts) : l'adversaire qui a le
+ * plus d'objets (or dépensé, ce que l'app voit de ses objets), s'il en a 30 % de plus que la
+ * moyenne de son équipe et 1 500 pièces d'or d'écart ; et l'adversaire qui cause la plupart de tes
+ * morts récentes (rec.itemFocus). Contexte 'fedAp' ou 'fedAd' selon ses dégâts du moment (profil
+ * corrigé par ses objets, comme l'app) : magiques à partir de 60 %, physiques jusqu'à 40 %.
+ */
+export function threatContexts(profiles, itemFoes, itemFocus) {
+  return (itemFoes ?? []).map((foes, k) => {
+    if (!Array.isArray(foes) || foes.length < 5) return []
+    const typeOf = (row) => {
+      const ap = foeApShare(profiles?.[row[0]], row[2], row[3])
+      return ap >= 0.6 ? 'fedAp' : ap <= 0.4 ? 'fedAd' : null
+    }
+    const out = new Set()
+    const mean = foes.reduce((t, f) => t + (f[1] ?? 0), 0) / foes.length
+    const top = [...foes].sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))[0]
+    if (mean > 0 && top[1] >= FED_RATIO * mean && top[1] - mean >= FED_GAP) {
+      const t = typeOf(top)
+      if (t) out.add(t)
+    }
+    const killer = itemFocus?.[k] ? foes.find((f) => f[0] === itemFocus[k]) : null
+    if (killer) {
+      const t = typeOf(killer)
+      if (t) out.add(t)
+    }
+    return [...out]
+  })
+}
+
 /**
  * Composition adverse au moment de chaque achat (rec.itemFoes, voir extract.mjs foesAt), calculée
  * comme l'app en partie : les objets de chaque adversaire remplacent peu à peu son profil habituel
@@ -54,7 +110,6 @@ const CRIT_KIT = { Yasuo: 2, Yone: 2 }
  * attendue) et 'crit' (au moins l'équivalent de 1,2 adversaire entièrement critique), ou null.
  */
 export function purchaseContexts(profiles, itemFoes) {
-  const clamp01 = (x) => Math.max(0, Math.min(1, x))
   return (itemFoes ?? []).map((foes) => {
     if (!Array.isArray(foes) || !foes.length) return null
     let magic = 0
@@ -66,17 +121,7 @@ export function purchaseContexts(profiles, itemFoes) {
       if (!p || (p.g ?? 0) < 20 || !(p.minutes > 0)) continue
       known++
       const dmg = (p.phys ?? 0) + (p.magic ?? 0)
-      const baseAp = dmg > 0 ? p.magic / dmg : 0.5
-      const baseItemAp = (p.itemN ?? 0) >= 10 ? p.itemAp / p.itemN : null
-      const dmgKnown = clamp01((apVal + adVal) / 6000)
-      let apShare = baseAp
-      if (apVal + adVal > 0) {
-        const itemAp = apVal / (apVal + adVal)
-        apShare =
-          baseItemAp !== null
-            ? clamp01(baseAp + 0.8 * dmgKnown * (itemAp - baseItemAp))
-            : (1 - 0.75 * dmgKnown) * baseAp + 0.75 * dmgKnown * itemAp
-      }
+      const apShare = foeApShare(p, apVal, adVal)
       const perMin = dmg / p.minutes
       magic += perMin * apShare
       phys += perMin * (1 - apShare)
@@ -95,7 +140,8 @@ export function purchaseContexts(profiles, itemFoes) {
 }
 
 /**
- * Contexte « adversaire très en avance » de chaque achat (rec.itemFed : son champion) : 'fedAp' si
+ * (Ancienne définition, avant le 24 novembre 2026 : voir threatContexts.) Contexte « adversaire très
+ * en avance » de chaque achat (rec.itemFed : son champion) : 'fedAp' si
  * ses dégâts sont surtout magiques, 'fedAd' s'ils sont surtout physiques (profils mesurés).
  */
 export function fedContexts(profiles, fed) {
@@ -143,6 +189,9 @@ function contextsAt(contexts, rec, k) {
   return [...base.filter((x) => x !== 'ap' && x !== 'ad' && x !== 'crit'), ...now]
 }
 
+/** Menaces d'un achat (rec.itemFedCtx : liste par achat ; une seule chaîne dans les anciennes données). */
+export const fedOf = (rec, k) => [].concat(rec.itemFedCtx?.[k] ?? []).filter(Boolean)
+
 function addCell(map, key, win, e) {
   const cell = (map[key] ??= [0, 0, 0])
   cell[0] += 1
@@ -184,8 +233,7 @@ export function addNext(state, c, rec, contexts) {
     const ctx = contextsAt(contexts, rec, k)
     const st = STATE_CTX[rec.itemState?.[k]]
     if (st) ctx.push(st)
-    const fed = rec.itemFedCtx?.[k]
-    if (fed) ctx.push(fed)
+    ctx.push(...fedOf(rec, k))
     for (const x of ctx) addCell((nx.x[x] ??= {}), id, rec.win, e)
   }
   return expect
@@ -418,7 +466,9 @@ export function emptyNextBacktest() {
     // Écart prévu de l'objet acheté, pour chaque poids : [achats, Σ écart prévu] des achats
     // conformes / autres. Comparé au gain observé, il dit si les écarts du conseil se retrouvent
     // dans les victoires (voir contrastSlope).
-    gx: GAMMAS.map(() => ({ f: [0, 0], o: [0, 0] }))
+    gx: GAMMAS.map(() => ({ f: [0, 0], o: [0, 0] })),
+    // Même mesure par rang (1 : 2e objet… 5 : 6e objet), pour chaque poids.
+    rk: {}
   }
 }
 
@@ -441,9 +491,8 @@ export function evaluateNext(meta, contexts, rec, bt, dd, oldRecommend) {
     if (!actual || typeof p !== 'number') continue
     const owned = names.slice(0, k).filter(Boolean)
     const st = STATE_CTX[rec.itemState?.[k]]
-    const fed = rec.itemFedCtx?.[k]
     const comp = contextsAt(contexts, rec, k).map((x) => [x, 1])
-    const ctx = [...comp, ...(st ? [[st, 1]] : []), ...(fed ? [[fed, 1]] : [])]
+    const ctx = [...comp, ...(st ? [[st, 1]] : []), ...fedOf(rec, k).map((x) => [x, 1])]
     const ranked = rankNext(next, owned, ctx, { gamma: 0, slope: 1 })
     const mine = ranked.find((x) => x.item === actual)
     if (ranked.length < 3 || !mine) continue
@@ -458,6 +507,8 @@ export function evaluateNext(meta, contexts, rec, bt, dd, oldRecommend) {
     }
     const x = mine.lift - (sw > 0 ? sp / sw : 0)
     bt.gx ??= GAMMAS.map(() => ({ f: [0, 0], o: [0, 0] }))
+    bt.rk ??= {}
+    const byRank = (bt.rk[k] ??= GAMMAS.map(() => ({ f: [0, 0], o: [0, 0] })))
     GAMMAS.forEach((gamma, i) => {
       let best = ranked[0]
       for (const y of ranked)
@@ -466,6 +517,10 @@ export function evaluateNext(meta, contexts, rec, bt, dd, oldRecommend) {
       const cell = bt.g[i][side]
       cell[0] += 1
       cell[1] += ex
+      // (même mesure pour chaque rang : le 2e objet a sa propre preuve.)
+      const rc = byRank[i][side]
+      rc[0] += 1
+      rc[1] += ex
       const px = bt.gx[i][side]
       px[0] += 1
       px[1] = Math.round((px[1] + x) * 1e5) / 1e5
@@ -515,11 +570,10 @@ export function evaluateSwap(meta, contexts, rec, bt, dd) {
   if (names.some((n) => !n)) return false
   const model = meta.nextModel ?? DEFAULT_MODEL
   const st = STATE_CTX[rec.itemState?.[k]]
-  const fed = rec.itemFedCtx?.[k]
   const ctx = [
     ...contextsAt(contexts, rec, k).map((x) => [x, 1]),
     ...(st ? [[st, 1]] : []),
-    ...(fed ? [[fed, 1]] : [])
+    ...fedOf(rec, k).map((x) => [x, 1])
   ]
   const score = (e) => model.slope * (e.lift + model.gamma * e.share)
   let best = null
@@ -569,7 +623,7 @@ export function swapSummary(bt) {
 }
 
 /** Gain mesuré : victoires en plus des achats conformes moins celles des autres, et son erreur. */
-function gainOf({ f, o }) {
+export function gainOf({ f, o }) {
   if (!(f[0] > 0) || !(o[0] > 0)) return null
   const gain = f[1] / f[0] - o[1] / o[0]
   return {
@@ -612,11 +666,30 @@ export function contrastSlope(bt, i) {
   }
 }
 
+/** Poids de popularité qui a le mieux réussi (celui de nextModel), avec son indice. */
+function bestGamma(bt) {
+  let best = null
+  GAMMAS.forEach((gamma, i) => {
+    const g = gainOf(bt.g[i])
+    if (g && (!best || g.gain > best.gain)) best = { gamma, gain: g.gain, i }
+  })
+  return best
+}
+
 /** Résumé publié (meta.backtest.next). */
 export function nextBacktestSummary(bt) {
   if (!bt?.n) return null
+  const best = bestGamma(bt)
+  // Gain par rang (2e au 6e objet) avec le poids retenu : '1' = 2e objet.
+  const ranks = {}
+  if (best)
+    for (const [k, cells] of Object.entries(bt.rk ?? {})) {
+      const g = gainOf(cells[best.i])
+      if (g) ranks[k] = g
+    }
   return {
     decisions: bt.n,
+    ...(Object.keys(ranks).length ? { ranks } : {}),
     gammas: GAMMAS.map((gamma, i) => ({
       gamma,
       ...(gainOf(bt.g[i]) ?? {}),
@@ -634,11 +707,7 @@ export function nextBacktestSummary(bt) {
  */
 export function nextModel(bt) {
   if (!bt || bt.n < MIN_MODEL_DECISIONS) return { ...DEFAULT_MODEL, decisions: bt?.n ?? 0 }
-  let best = null
-  GAMMAS.forEach((gamma, i) => {
-    const g = gainOf(bt.g[i])
-    if (g && (!best || g.gain > best.gain)) best = { gamma, gain: g.gain, i }
-  })
+  const best = bestGamma(bt)
   // Pente de décision (gain observé ÷ écart prévu) dès qu'elle est mesurée ; sinon, pente de
   // calibration de tous les achats. (Bot Master+, novembre 2026 : calibration 0,2 alors que le
   // conseil rapportait +2,9 points, ce qui réduisait son poids dans l'app à un tiers.)
@@ -656,4 +725,42 @@ export function nextModel(bt) {
     measured: true,
     decisions: bt.n
   }
+}
+
+/**
+ * Défense face à une menace, à avance égale. Quand un adversaire très en avance ou qui cause la
+ * plupart de tes morts fait surtout des dégâts magiques (fedAp) ou physiques (fedAd), ou quand
+ * l'équipe est en retard (behind) : les achats défensifs adaptés (résistance magique, armure ; en
+ * retard, armure, RM ou PV) gagnent-ils plus que les autres achats faits dans la même situation ?
+ * C'est la règle que l'app appliquait d'office (« priorité à la défense ») ; elle ne l'applique plus
+ * que si cette mesure la confirme. state.defense : { contexte : { d, o : [achats, victoires en plus] } }.
+ */
+const DEFENSE_OF = { fedAp: /m/, fedAd: /a/, behind: /[amh]/ }
+
+export function addDefense(state, rec, expect) {
+  const items = rec.items ?? []
+  for (let k = 1; k < items.length; k++) {
+    const e = expect?.[k]
+    if (typeof e !== 'number') continue
+    const def = rec.itemDef?.[k] ?? ''
+    const ctx = [...fedOf(rec, k), ...(rec.itemState?.[k] === 'b' ? ['behind'] : [])]
+    for (const c of new Set(ctx)) {
+      const re = DEFENSE_OF[c]
+      if (!re) continue
+      const d = (state.defense ??= {})[c] ??= { d: [0, 0], o: [0, 0] }
+      const cell = re.test(def) ? d.d : d.o
+      cell[0] += 1
+      cell[1] = Math.round((cell[1] + (rec.win ? 1 : 0) - e) * 10000) / 10000
+    }
+  }
+}
+
+/** Résumé publié (meta.defense) : gain des achats défensifs adaptés sur les autres, par situation. */
+export function defenseSummary(state) {
+  const out = {}
+  for (const [c, { d, o }] of Object.entries(state.defense ?? {})) {
+    const g = gainOf({ f: d, o })
+    if (g && d[0] >= 30 && o[0] >= 30) out[c] = g
+  }
+  return Object.keys(out).length ? out : null
 }
