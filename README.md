@@ -73,7 +73,11 @@ soigne et encaisse davantage : les valeurs observées liaient le contexte à l'i
    Les **sorts d'invocateur et clés de voûte adverses** sont mesurés de la même façon (`#cleanse`,
    `#exhaust`, `#ignite`, et par effet : `#ksHeal` soins, `#ksAs` vitesse d'attaque, `#ksBurst`,
    `#ksTank`) : l'API en jeu les donne à l'app dès le début de la partie.
-   Ces écarts sont publiés déjà lissés, et seulement s'ils dépassent 0,4 point. Publie
+   Ces écarts sont publiés déjà lissés, et seulement s'ils dépassent 0,4 point. Le hasard y est
+   corrigé comme pour les autres lissages (`priors.noise`, mesuré sur les paires d'alliés) et, pour
+   les achats jugés à avance égale, selon la vraie variance d'une victoire en plus de l'attente
+   (e(1 − e), `nowVar`) : sans cela, les parties reprises du patch précédent faisaient paraître nuls
+   tous ces écarts en début de patch (aucun publié sur la Faille du 18 au 24 novembre 2026). Publie
    aussi tous les champions vus dans l'équipe adverse, quel que soit leur poste (`threats` :
    parties, taux de victoire de leur équipe, taux de ban), pour les conseils de ban.
 10. **Backtest** : chaque nouvelle partie est comparée à la méta précédente avant d'être ajoutée
@@ -101,10 +105,15 @@ soigne et encaisse davantage : les valeurs observées liaient le contexte à l'i
 16. Écrit `meta.json` (et `meta-gold.json`). Les champions qui n'ont pas encore assez de parties sur le nouveau patch
    gardent leur build du patch précédent (l'app prend alors les runes recommandées par Riot).
 
-Les compteurs du patch sont conservés dans `state/` (`state/gold/` pour la méta Or à Émeraude), sur la branche `data` du dépôt (réécrite à chaque exécution pour ne pas alourdir l'historique de `main`) : chaque exécution ajoute de nouvelles parties,
+Les compteurs du patch sont conservés dans `state/` (`state/gold/` pour la méta Or à Émeraude), sur la branche `data` du dépôt (réécrite à chaque exécution pour ne pas alourdir l'historique de `main` ; fichiers compressés en `.json.gz`, car GitHub refuse les fichiers de plus de 100 Mo) : chaque exécution ajoute de nouvelles parties,
 les données s'affinent donc de jour en jour jusqu'au patch suivant. Au changement de patch, les
 données du patch précédent sont reprises avec un poids de 25 % pour des builds stables dès le
-premier jour.
+premier jour, sans les « miettes » (cases valant moins d'une demi-partie une fois reprises : pages
+de runes et combinaisons vues une seule fois). Sans cela, chaque patch transmettait toute sa traîne
+au suivant et l'état ne faisait que grossir (l'état ARAM repartirait à 111 Mo au lieu de 20 Mo).
+En cours de patch, ces miettes ne sont retirées que si un état dépasse 250 Mo. Les métas sont
+publiées avant l'enregistrement de l'état : si celui-ci échoue, l'app reçoit quand même la
+nouvelle méta.
 
 ## Lissage mesuré
 
@@ -199,6 +208,9 @@ corrigé par les besoins de la partie (règles, adversaires précis, tes parties
   son erreur type `se`), pour plusieurs poids de la popularité (`gamma` : part des joueurs qui
   prennent l'objet après les mêmes objets, de 0 à 1) ;
 - calibration : victoires en plus observées par point d'écart prévu (1 : prévisions exactes) ;
+- pour chaque poids, l'écart prévu entre les achats conformes et les autres (`predicted`) et la
+  « pente de décision » : gain observé ÷ écart prévu (`slope`, `se`, dès 1 000 achats de chaque
+  côté) ;
 - l'ancien conseil (objets les plus construits selon le contexte), jugé de la même façon sur les
   achats du 4e au 6e objet (`old`).
 
@@ -206,11 +218,17 @@ corrigé par les besoins de la partie (règles, adversaires précis, tes parties
 d'après l'objet suivant (vendre un objet, hors deux premiers objets du cœur, en acheter un autre) est
 calculé avec la méta de la veille. Quand un échange était conseillé (écart d'au moins 2 points), les
 joueurs qui ont acheté l'objet conseillé après une revente sont comparés à ceux qui n'ont rien changé,
-à avance égale (`gain`, avec son erreur type).
+à avance égale (`gain`, avec son erreur type). L'app ne propose ces échanges que s'ils font nettement
+gagner (gain moins deux erreurs types au-dessus de 0, sur au moins 100 échanges suivis). Novembre
+2026 : sur la Faille, tous les échanges vont avec la défaite (−6 points pour l'échange conseillé,
+−8 à −10 pour les autres, +1 pour rien changer), donc aucun n'est proposé.
 
 Dès 1 000 achats vérifiés, `nextModel` publie le poids de popularité qui a le mieux réussi et la
-pente de calibration (rapprochée de 1 selon son incertitude, bornée entre 0 et 2) : l'app multiplie
-les écarts par cette pente. Si les écarts ne se vérifient pas le lendemain (pente proche de 0), les
+pente (rapprochée de 1 selon son incertitude, bornée entre 0 et 2) : l'app multiplie les écarts par
+cette pente. C'est la pente de décision dès qu'elle est mesurée (la question que pose l'app : suivre
+le conseil rapporte-t-il autant que prévu ?), sinon la pente de calibration de tous les achats, plus
+sensible aux objets rares (bot Master+, novembre 2026 : calibration 0,2 alors que le conseil
+rapportait +2,9 points, ce qui réduisait son poids à un tiers). Si les écarts ne se vérifient pas le lendemain (pente proche de 0), les
 règles reprennent la main et l'app n'affiche plus d'explication tirée de ces mesures. Le résultat
 est affiché dans l'app (Réglages, « Qualité du moteur », et Bilan, « L'app t'aide-t-elle ? »).
 

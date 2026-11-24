@@ -323,8 +323,37 @@ test('objets face aux objets adverses présents au moment de l’achat', async (
     }))
   }
   assert.ok(state.nowAll[0] >= 20000)
+  // Variance due au hasard d'une victoire en plus : e(1 − e), suivie pour chaque achat.
+  assert.equal(state.nowVar[0], state.nowAll[0])
+  assert.ok(state.nowVar[1] / state.nowVar[0] <= 0.25)
   const counters = buildItemCounters(state, dd, { minItemGames: 100, minPairGames: 40 })
   assert.ok(counters.Pen?.['#armor']?.[1] > 0.004, JSON.stringify(counters.Pen))
+})
+
+test('objets face aux adversaires : hasard corrigé comme les autres lissages (données reprises)', async () => {
+  const { buildItemCounters } = await import('../src/aggregate.mjs')
+  // 20 objets × 15 adversaires, 400 parties chacun : écarts de ±2,2 points, soit une variance
+  // observée (4,8e-4) sous le hasard nominal (6,25e-4), comme en début de patch quand une partie
+  // des parties est reprise du patch précédent à 25 % (plus précise que son nombre ne le dit).
+  const state = emptyState('16.23', 0)
+  state.champs.A = { g: 120000, w: 60000 }
+  const items = new Map()
+  for (let i = 0; i < 20; i++) {
+    items.set(100 + i, { name: `I${i}`, isLegendary: true, traits: [] })
+    state.itemAll[100 + i] = [6000, 3000]
+    for (let j = 0; j < 15; j++) {
+      const dev = (i + j) % 2 ? 0.022 : -0.022
+      ;(state.itemFoe[100 + i] ??= {})[`F${j}`] = [400, 400 * (0.5 + dev)]
+      state.foeAll[`F${j}`] = [8000, 4000]
+    }
+  }
+  const count = (out) => Object.values(out).reduce((t, v) => t + Object.keys(v).length, 0)
+  // Hasard nominal : aucun écart réel détectable, rien de publié (Faille, novembre 2026).
+  assert.equal(count(buildItemCounters(state, { items })), 0)
+  // Hasard corrigé (mesuré par les paires d'alliés, priors.noise) : les écarts réapparaissent.
+  const fixed = buildItemCounters(state, { items }, { noise: 0.5 })
+  assert.equal(count(fixed), 300)
+  assert.ok(Math.abs(fixed.I0.F1[1]) >= 0.004, JSON.stringify(fixed.I0))
 })
 
 test('sorts et clés de voûte adverses, échanges en fin de build', async () => {
@@ -362,4 +391,35 @@ test('sorts et clés de voûte adverses, échanges en fin de build', async () =>
   const sum = swapSummary(bt)
   assert.equal(sum.decisions, 3)
   assert.equal(sum.gain.gain, 1)
+})
+
+test('miettes : les cases de moins d’une demi-partie reprises d’un patch précédent sont retirées', async () => {
+  const { dropCrumbs, seedFromPrevious, upgradeState } = await import('../src/aggregate.mjs')
+  const prev = emptyState('16.22', 0)
+  prev.champs.Garen = {
+    g: 9, w: 5,
+    runes: { rare: [1, 1], courante: [8, 4] },
+    bench: { cs10: [4, 280] },
+    nx: { a: { '3': { A: [1, 0.02, 0.1], B: [6, 0.01, 0.2] } } },
+    open: { g: 1, top: 1, firstN: 0, firstMin: 0, lanes: {} }
+  }
+  const seeded = seedFromPrevious(emptyState('16.23', 0), prev, 0.25)
+  const c = seeded.champs.Garen
+  // Une page vue une fois (0,25 après reprise) disparaît, la courante reste (2 parties).
+  assert.deepEqual(Object.keys(c.runes), ['courante'])
+  assert.deepEqual(c.runes.courante, [2, 1])
+  assert.deepEqual(c.bench.cs10, [1, 70])
+  assert.deepEqual(Object.keys(c.nx.a['3']), ['B'])
+  // Compteurs simples (pas des cases) et structure conservés.
+  assert.equal(c.g, 2.25)
+  assert.equal(c.open.g, 0.25)
+  // En cours de patch, le chargement ne touche à rien (seulement la soupape de taille, run.mjs) ;
+  // quand on nettoie, les parties du patch en cours (au moins 1) restent.
+  const lux = () => ({ ...emptyState('16.23', 0), champs: { Lux: { g: 1.25, w: 1, runes: { a: [1, 1], b: [0.25, 0], c: [1.25, 1] } } } })
+  assert.deepEqual(Object.keys(upgradeState(lux()).champs.Lux.runes), ['a', 'b', 'c'])
+  assert.deepEqual(Object.keys(dropCrumbs(lux().champs).Lux.runes), ['a', 'c'])
+  // Rien d'autre que des cases numériques n'est touché.
+  const odd = { s: ['x', 'y'], e: [], n: [0.1] }
+  dropCrumbs(odd)
+  assert.deepEqual(odd, { s: ['x', 'y'], e: [], n: [0.1] })
 })

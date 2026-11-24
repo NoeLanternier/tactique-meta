@@ -151,4 +151,35 @@ test('backtest : les conseils de la veille sont jugés sur les parties du lendem
   assert.equal(summary.decisions, bt.next.n)
   assert.ok(summary.gammas[0].gain > 0.05)
   assert.ok(summary.calibration.slope > 0.5)
+  // Écart prévu suivi pour chaque poids, sur les mêmes achats que le gain.
+  GAMMAS.forEach((_, i) => {
+    assert.equal(bt.next.gx[i].f[0], bt.next.g[i].f[0])
+    assert.equal(bt.next.gx[i].o[0], bt.next.g[i].o[0])
+  })
+  // (les achats conformes au conseil avaient un écart prévu plus grand que les autres.)
+  assert.ok(bt.next.gx[0].f[1] / bt.next.gx[0].f[0] > bt.next.gx[0].o[1] / bt.next.gx[0].o[0])
+})
+
+test('pente de décision : gain observé ÷ écart prévu, préférée à la calibration de tous les achats', async () => {
+  const { contrastSlope } = await import('../src/nextItems.mjs')
+  const bt = emptyNextBacktest()
+  bt.n = 5000
+  // Conseil suivi : +3 points observés pour +6 prévus ; calibration de tous les achats à 0,2.
+  bt.g[0] = { f: [2000, 2000 * 0.03], o: [3000, 0] }
+  bt.gx[0] = { f: [2000, 2000 * 0.06], o: [3000, 0] }
+  bt.cal = [5000, 0, 0, 5000 * 0.01, 5000 * 0.002]
+  const c = contrastSlope(bt, 0)
+  assert.equal(c.predicted, 0.06)
+  assert.equal(c.slope, 0.5)
+  assert.ok(Math.abs(c.se - 0.241) < 0.002, JSON.stringify(c))
+  const model = nextModel(bt)
+  // Rapprochée de 1 selon son incertitude (a priori 1 ± 0,5) : entre 0,5 et 1.
+  assert.ok(model.slope > 0.55 && model.slope < 0.65, `slope ${model.slope}`)
+  // Trop peu d'achats pour la pente de décision : retour à la calibration (0,2 ici).
+  bt.gx[0] = { f: [500, 500 * 0.06], o: [3000, 0] }
+  assert.equal(contrastSlope(bt, 0), null)
+  assert.ok(nextModel(bt).slope < 0.3, `slope ${nextModel(bt).slope}`)
+  // Écart prévu nul ou négatif : pas de pente de décision.
+  bt.gx[0] = { f: [2000, 0], o: [3000, 0] }
+  assert.equal(contrastSlope(bt, 0).slope, undefined)
 })

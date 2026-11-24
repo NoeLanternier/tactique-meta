@@ -414,7 +414,11 @@ export function emptyNextBacktest() {
     // en plus observées : [n, Σx, Σy, Σx², Σxy].
     cal: [0, 0, 0, 0, 0],
     // Ancien conseil (objets les plus construits selon le contexte), à avance égale.
-    old: { f: [0, 0], o: [0, 0] }
+    old: { f: [0, 0], o: [0, 0] },
+    // Écart prévu de l'objet acheté, pour chaque poids : [achats, Σ écart prévu] des achats
+    // conformes / autres. Comparé au gain observé, il dit si les écarts du conseil se retrouvent
+    // dans les victoires (voir contrastSlope).
+    gx: GAMMAS.map(() => ({ f: [0, 0], o: [0, 0] }))
   }
 }
 
@@ -446,14 +450,6 @@ export function evaluateNext(meta, contexts, rec, bt, dd, oldRecommend) {
     const ex = (rec.win ? 1 : 0) - p
     bt.n++
     counted = true
-    GAMMAS.forEach((gamma, i) => {
-      let best = ranked[0]
-      for (const x of ranked)
-        if (x.lift + gamma * x.share > best.lift + gamma * best.share) best = x
-      const cell = best.item === actual ? bt.g[i].f : bt.g[i].o
-      cell[0] += 1
-      cell[1] += ex
-    })
     let sw = 0
     let sp = 0
     for (const x of ranked) {
@@ -461,6 +457,19 @@ export function evaluateNext(meta, contexts, rec, bt, dd, oldRecommend) {
       sp += x.share * x.lift
     }
     const x = mine.lift - (sw > 0 ? sp / sw : 0)
+    bt.gx ??= GAMMAS.map(() => ({ f: [0, 0], o: [0, 0] }))
+    GAMMAS.forEach((gamma, i) => {
+      let best = ranked[0]
+      for (const y of ranked)
+        if (y.lift + gamma * y.share > best.lift + gamma * best.share) best = y
+      const side = best.item === actual ? 'f' : 'o'
+      const cell = bt.g[i][side]
+      cell[0] += 1
+      cell[1] += ex
+      const px = bt.gx[i][side]
+      px[0] += 1
+      px[1] = Math.round((px[1] + x) * 1e5) / 1e5
+    })
     bt.cal[0] += 1
     bt.cal[1] += x
     bt.cal[2] += ex
@@ -581,12 +590,38 @@ function slopeOf(cal) {
   return { slope: r3(slope), se: r3(Math.sqrt(0.25 / vx)) }
 }
 
+/** Achats conformes et autres nécessaires pour juger les écarts prévus sur le gain observé. */
+const MIN_CONTRAST = 1000
+
+/**
+ * Écart prévu entre les achats conformes au conseil et les autres (moyenne de l'écart prévu de
+ * l'objet acheté), et pente « de décision » : gain observé ÷ écart prévu, avec son erreur. C'est
+ * la question que pose l'app (suivre le conseil plutôt que les règles rapporte-t-il autant que
+ * prévu ?), moins sensible que la pente de calibration aux objets rares aux écarts prévus extrêmes.
+ */
+export function contrastSlope(bt, i) {
+  const px = bt?.gx?.[i]
+  const g = gainOf(bt?.g?.[i] ?? { f: [0, 0], o: [0, 0] })
+  if (!px || !g || px.f[0] < MIN_CONTRAST || px.o[0] < MIN_CONTRAST) return null
+  const predicted = px.f[1] / px.f[0] - px.o[1] / px.o[0]
+  if (!(predicted > 0.003)) return { predicted: r4(predicted) }
+  return {
+    predicted: r4(predicted),
+    slope: r3(g.gain / predicted),
+    se: r3(g.se / predicted)
+  }
+}
+
 /** Résumé publié (meta.backtest.next). */
 export function nextBacktestSummary(bt) {
   if (!bt?.n) return null
   return {
     decisions: bt.n,
-    gammas: GAMMAS.map((gamma, i) => ({ gamma, ...(gainOf(bt.g[i]) ?? {}) })),
+    gammas: GAMMAS.map((gamma, i) => ({
+      gamma,
+      ...(gainOf(bt.g[i]) ?? {}),
+      ...(contrastSlope(bt, i) ?? {})
+    })),
     calibration: slopeOf(bt.cal),
     old: gainOf(bt.old)
   }
@@ -602,9 +637,13 @@ export function nextModel(bt) {
   let best = null
   GAMMAS.forEach((gamma, i) => {
     const g = gainOf(bt.g[i])
-    if (g && (!best || g.gain > best.gain)) best = { gamma, gain: g.gain }
+    if (g && (!best || g.gain > best.gain)) best = { gamma, gain: g.gain, i }
   })
-  const cal = slopeOf(bt.cal)
+  // Pente de décision (gain observé ÷ écart prévu) dès qu'elle est mesurée ; sinon, pente de
+  // calibration de tous les achats. (Bot Master+, novembre 2026 : calibration 0,2 alors que le
+  // conseil rapportait +2,9 points, ce qui réduisait son poids dans l'app à un tiers.)
+  const contrast = best ? contrastSlope(bt, best.i) : null
+  const cal = contrast?.slope !== undefined ? contrast : slopeOf(bt.cal)
   let slope = 1
   if (cal) {
     const wp = 1 / SLOPE_PRIOR_SD ** 2

@@ -73,9 +73,27 @@ jobs:
           GOLD_REGIONS: ${{ vars.GOLD_REGIONS == 'none' && ' ' || vars.GOLD_REGIONS || 'euw1,na1' }}
           # Variable ROLES : postes collectés (tous par défaut).
           ROLES: ${{ vars.ROLES || 'top,jungle,mid,bot,support' }}
-          # Cinq postes et deux niveaux en mémoire : on laisse plus de place à Node.
-          NODE_OPTIONS: --max-old-space-size=6144
+          # Cinq postes, deux niveaux et l'ARAM en mémoire (environ 2 Go en milieu de patch) : on
+          # laisse de la marge à Node (machines GitHub de 16 Go).
+          NODE_OPTIONS: --max-old-space-size=8192
         run: node src/run.mjs
+
+      # Métas publiées sur la branche « meta », réécrite à chaque fois (comme « data ») : l'app les
+      # lit là, toutes les 6 heures, sans que l'historique du dépôt grossisse. Publiées avant
+      # l'enregistrement de l'état : si celui-ci échoue, l'app reçoit quand même la nouvelle méta.
+      - name: Publication des métas (branche meta)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tmp="$(mktemp -d)"
+          cp meta*.json "$tmp/"
+          cd "$tmp"
+          git init -q -b meta
+          git add -A
+          git -c user.name="tactique-meta-bot" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "Méta du $(date -u '+%Y-%m-%d %Hh') UTC"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" meta
 
       - name: Sauvegarde de l'état (branche data)
         env:
@@ -93,22 +111,6 @@ jobs:
               -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
               commit -q -m "État du $(date -u '+%Y-%m-%d %Hh')"
           git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" data
-
-      # Métas publiées sur la branche « meta », réécrite à chaque fois (comme « data ») : l'app les
-      # lit là, toutes les 6 heures, sans que l'historique du dépôt grossisse.
-      - name: Publication des métas (branche meta)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          tmp="$(mktemp -d)"
-          cp meta*.json "$tmp/"
-          cd "$tmp"
-          git init -q -b meta
-          git add -A
-          git -c user.name="tactique-meta-bot" \
-              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-              commit -q -m "Méta du $(date -u '+%Y-%m-%d %Hh') UTC"
-          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" meta
 
       # Copie sur main une fois par jour seulement (anciennes versions de l'app, et secours).
       - name: Copie quotidienne des métas (branche main)

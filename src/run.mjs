@@ -44,6 +44,7 @@ import {
   expectedEnemy,
   laneContexts,
   seedFromPrevious,
+  dropCrumbs,
   upgradeState
 } from './aggregate.mjs'
 import { evaluateRecord } from './backtest.mjs'
@@ -182,6 +183,21 @@ function slotOf(bracket, role) {
 }
 
 /** Charge (ou crée) l'état du patch d'un poste dans un niveau. */
+/**
+ * État prêt à écrire. Au-delà de 250 millions de caractères (la limite d'une chaîne JavaScript est
+ * vers 536 millions, au-delà l'état ne s'écrirait plus), on retire d'abord les miettes reprises
+ * du patch précédent (voir dropCrumbs) : soupape de sécurité pour un patch très long.
+ */
+function compactJson(state, label) {
+  const json = JSON.stringify(state)
+  if (json.length <= STATE_SOFT_LIMIT) return json
+  dropCrumbs(state.champs)
+  const smaller = JSON.stringify(state)
+  log(`[${label}] état de ${(json.length / 1e6).toFixed(0)} Mo : miettes du patch précédent retirées (${(smaller.length / 1e6).toFixed(0)} Mo).`)
+  return smaller
+}
+const STATE_SOFT_LIMIT = 250e6
+
 function loadState(slot, dd, seed) {
   mkdirSync(slot.stateDir, { recursive: true })
   const statePath = join(slot.stateDir, `${dd.patch}.json`)
@@ -528,7 +544,7 @@ async function main() {
     for (const slot of ordered) {
       const { state, previous } = slot
       state.updatedAt = new Date().toISOString()
-      const json = JSON.stringify(state)
+      const json = compactJson(state, slot.label)
       writeFileSync(join(slot.stateDir, `${dd.patch}.json`), json)
       // On ne garde que l'état du patch en cours.
       for (const f of readdirSync(slot.stateDir))
@@ -554,7 +570,9 @@ async function main() {
       log(
         `${L} ${slot.records} joueurs ajoutés, ${meta.sampleGames} sur le patch, ${meta.freshBuilds} builds à jour, ${meta.builds.length} au total (état : ${mb} Mo).`
       )
-      if (json.length > 80e6) log(`${L} ATTENTION : état de ${mb} Mo, proche de la limite de 100 Mo de GitHub.`)
+      // Enregistré compressé (8 à 9 fois plus petit) ; la vraie limite est celle d'une chaîne
+      // JavaScript (environ 536 millions de caractères), au-delà de laquelle l'état ne s'écrit plus.
+      if (json.length > 350e6) log(`${L} ATTENTION : état de ${mb} Mo, la limite d'écriture est vers 530 Mo.`)
       log(`${L} lissages mesurés (parties a priori) : ${JSON.stringify(meta.priors)}`)
       if (meta.fit) log(`${L} équilibre de l'équipe : ${JSON.stringify(meta.fit)}`)
       if (meta.backtest) log(`${L} backtest : ${JSON.stringify(meta.backtest)}`)
@@ -577,7 +595,7 @@ async function main() {
     // Mode absent et aucune donnée sur ce patch : on garde la méta et l'état précédents tels quels.
     if (!run.records && Object.keys(state.champs ?? {}).length === 0) continue
     state.updatedAt = new Date().toISOString()
-    const json = JSON.stringify(state)
+    const json = compactJson(state, run.label)
     writeFileSync(join(run.stateDir, `${dd.patch}.json`), json)
     for (const f of readdirSync(run.stateDir))
       if (f.endsWith('.json') && f !== `${dd.patch}.json`) rmSync(join(run.stateDir, f))

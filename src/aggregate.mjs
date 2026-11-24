@@ -135,6 +135,27 @@ export function upgradeState(state) {
   return state
 }
 
+/** En dessous d'une demi-partie, une case de compteur est une miette (voir dropCrumbs). */
+export const CRUMB = 0.5
+
+/**
+ * Retire les miettes des compteurs : cases [parties, …] valant moins d'une demi-partie, c'est-à-dire
+ * reprises d'un patch précédent (à 25 %, une partie isolée y vaut 0,25). Sans cela, chaque patch
+ * transmettait au suivant toutes ses pages de runes et combinaisons vues une seule fois, et l'état
+ * ne faisait que grossir (plus de la moitié de sa taille, quelques % des parties à 25 %).
+ * Appliqué à la reprise d'un patch (seedFromPrevious) ; en cours de patch, seulement si l'état
+ * devient trop gros (voir run.mjs). Les parties du patch en cours (1 au moins) ne sont jamais touchées.
+ */
+export function dropCrumbs(x, min = CRUMB) {
+  if (!x || typeof x !== 'object' || Array.isArray(x)) return x
+  for (const k of Object.keys(x)) {
+    const v = x[k]
+    if (!Array.isArray(v)) dropCrumbs(v, min)
+    else if (v.length >= 2 && v.every((n) => typeof n === 'number') && v[0] < min) delete x[k]
+  }
+  return x
+}
+
 /** Compteurs [parties, victoires] tenus pour chaque jungler. with / against : alliés et adversaires
  * (hors jungler adverse, compté dans vs). */
 const CHAMP_MAPS = [
@@ -380,6 +401,11 @@ export function addRecord(state, rec) {
     if (typeof e !== 'number') return
     const x = (rec.win ? 1 : 0) - e
     addExcess((state.nowAll ??= [0, 0]), x)
+    // Variance due au hasard d'une victoire en plus : e(1 − e), moins que 0,25 quand l'avance
+    // prédit bien l'issue (voir buildItemCounters). [achats, somme de e(1 − e)].
+    const nv = (state.nowVar ??= [0, 0])
+    nv[0] += 1
+    nv[1] = Math.round((nv[1] + e * (1 - e)) * 10000) / 10000
     addExcess(((state.itemNow ??= {})[id] ??= [0, 0]), x)
     for (const t of rec.itemTags?.[k] ?? []) {
       addExcess(((state.traitNow ??= {})[t] ??= [0, 0]), x)
@@ -528,13 +554,14 @@ function scaleDeep(x, factor) {
 
 /** Reprend les compteurs d'un patch précédent avec un poids réduit (démarrage plus stable). */
 export function seedFromPrevious(state, previous, factor = 0.25) {
-  state.champs = scaleDeep(previous.champs ?? {}, factor)
+  state.champs = dropCrumbs(scaleDeep(previous.champs ?? {}, factor))
   state.profiles = scaleDeep(previous.profiles ?? {}, factor)
   state.itemAll = scaleDeep(previous.itemAll ?? {}, factor)
   state.itemFoe = scaleDeep(previous.itemFoe ?? {}, factor)
   state.foeAll = scaleDeep(previous.foeAll ?? {}, factor)
   // Objets face aux objets adverses au moment de l'achat (victoires en plus).
   state.nowAll = scaleDeep(previous.nowAll ?? [0, 0], factor)
+  state.nowVar = scaleDeep(previous.nowVar ?? [0, 0], factor)
   state.itemNow = scaleDeep(previous.itemNow ?? {}, factor)
   state.traitNow = scaleDeep(previous.traitNow ?? {}, factor)
   state.itemTrait = scaleDeep(previous.itemTrait ?? {}, factor)
@@ -1160,7 +1187,11 @@ export function buildVariants(champ, c, dd, { minGames = 40, priors, allowNoRune
 /** Achats (avec écart d'or connu) à partir desquels les objets adverses du moment remplacent ceux de fin de partie. */
 const MIN_NOW_PURCHASES = 20000
 
-export function buildItemCounters(state, dd, { minItemGames = 200, minPairGames = 40 } = {}) {
+export function buildItemCounters(
+  state,
+  dd,
+  { minItemGames = 200, minPairGames = 40, noise = 1 } = {}
+) {
   let G = 0
   let W = 0
   for (const c of Object.values(state.champs)) {
@@ -1189,6 +1220,9 @@ export function buildItemCounters(state, dd, { minItemGames = 200, minPairGames 
   if (useNow) {
     for (let i = rows.length - 1; i >= 0; i--) if (rows[i].foe.startsWith('#')) rows.splice(i, 1)
     const all = nowAll[1] / nowAll[0]
+    // Hasard d'une victoire en plus de l'attente : e(1 − e) en moyenne (0,25 sans mesure).
+    const nv = state.nowVar
+    const pv = Array.isArray(nv) && nv[0] >= 1000 ? Math.min(0.25, nv[1] / nv[0]) : 0.25
     for (const [id, byTrait] of Object.entries(state.itemTrait ?? {})) {
       const it = dd.items.get(Number(id))
       const base = state.itemNow?.[id]
@@ -1197,14 +1231,14 @@ export function buildItemCounters(state, dd, { minItemGames = 200, minPairGames 
         const tn = state.traitNow?.[foe]
         if (cell[0] < minPairGames || !tn || tn[0] < 200) continue
         const dev = cell[1] / cell[0] - base[1] / base[0] - (tn[1] / tn[0] - all)
-        rows.push({ item: it.name, foe, n: cell[0], dev, v: 0.25 / cell[0] })
+        rows.push({ item: it.name, foe, n: cell[0], dev, v: pv / cell[0] })
       }
     }
   }
   const kOf = (trait) =>
     momPrior(
       rows.filter((r) => r.foe.startsWith('#') === trait).map((r) => [r.n, r.dev, r.v]),
-      { fallback: DEFAULT_PRIORS.counter, minCells: 200, minGames: 50000 }
+      { fallback: DEFAULT_PRIORS.counter, minCells: 200, minGames: 50000, scale: noise }
     ).k
   const k = { champ: kOf(false), trait: kOf(true) }
   const out = {}
@@ -1507,7 +1541,9 @@ export function buildMeta(state, dd0, previousMeta, options = {}) {
     priors,
     ...(fit ? { fit } : {}),
     threats: buildThreats(state),
-    itemCounters: buildItemCounters(state, dd),
+    // (hasard corrigé comme pour les autres lissages : sans cela, les compteurs repris du patch
+    // précédent font paraître nuls tous les effets en début de patch, voir noiseScale.)
+    itemCounters: buildItemCounters(state, dd, { noise: priors.noise ?? 1 }),
     backtest: backtestSummary(state.backtest),
     // Objet suivant : victoire attendue selon l'avance, et modèle vérifié par le backtest.
     ...(() => {
